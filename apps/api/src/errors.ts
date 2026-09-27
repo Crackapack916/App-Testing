@@ -56,6 +56,8 @@ const CODES: Record<string, [number, string]> = {
   ladder_must_start_at_one: [400, "The price ladder must start at 1 pack."],
   ladder_not_decreasing: [400, "Bigger orders can't cost more per pack."],
   ladder_price_invalid: [400, "Every tier needs a price above zero."],
+  invalid_push_token: [400, "Invalid push token."],
+  unknown_notification: [404, "Notification not found."],
   // payments
   unknown_bundle: [400, "Unknown credit bundle."],
 };

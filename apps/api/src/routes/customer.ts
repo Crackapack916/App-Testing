@@ -15,8 +15,9 @@ customer.get("/storefront", async (c) => {
                   from price_tiers t where t.product_id = s.product_id) as ladder
      from storefront s order by s.set_name`);
   const { rows: [batch] } = await c.get("db").query(
-    "select batch_date::text, cutoff_at from batch_for_time(app_now())");
-  return c.json({ products: rows, next_cutoff: batch.cutoff_at, batch_date: batch.batch_date });
+    "select batch_date::text, cutoff_at, app_now() as now from batch_for_time(app_now())");
+  // `now` lets the app count down on the server's clock, not the phone's.
+  return c.json({ products: rows, next_cutoff: batch.cutoff_at, batch_date: batch.batch_date, now: batch.now });
 });
 
 customer.get("/bundles", (c) => c.json({ bundles: BUNDLES }));
@@ -92,6 +93,17 @@ customer.get("/me/pulls", async (c) => {
   return c.json({ pulls: withImages(rows) });
 });
 
+customer.post("/me/push-token", async (c) => {
+  const { token, platform } = await c.req.json<{ token: string; platform: string }>();
+  await c.get("db").query("select register_push_token($1, $2, $3)", [c.get("user").id, token, platform]);
+  return c.json({ ok: true });
+});
+
+customer.post("/me/notifications/:id/opened", async (c) => {
+  await c.get("db").query("select mark_notification_opened($1, $2)", [c.req.param("id"), c.get("user").id]);
+  return c.json({ ok: true });
+});
+
 customer.get("/me/notifications", async (c) => {
   const { rows } = await c.get("db").query(
     `select n.id, n.kind, n.order_id, n.sent_at, n.opened_at, oc.clip_ref
@@ -104,11 +116,13 @@ customer.get("/me/notifications", async (c) => {
 customer.post("/me/buyback/quote", async (c) => {
   const { items } = await c.req.json<{ items: { card_id: string; finish: string; qty?: number }[] }>();
   const { rows } = await c.get("db").query(
-    `select i.card_id, i.finish, i.qty, p.market_cents::int, buylist_quote(p.market_cents, current_buylist_schedule())::int as quote_each
+    `select i.card_id, i.finish, i.qty, p.market_cents::int, buylist_quote(p.market_cents, current_buylist_schedule())::int as quote_each,
+            (p.card_id is null or p.price_asof < app_now() - (cfg()).max_price_age) as stale
      from jsonb_to_recordset($1::jsonb) as i(card_id uuid, finish text, qty int)
      left join card_prices_current p on p.card_id = i.card_id and p.finish = i.finish`,
     [JSON.stringify(items.map((i) => ({ ...i, qty: i.qty ?? 1 })))]);
-  return c.json({ items: rows, total_credits: rows.reduce((s, r) => s + (r.quote_each ?? 0) * r.qty, 0) });
+  // Same freshness rule request_buyback enforces, so a quote never promises what the sale will refuse.
+  return c.json({ items: rows, total_credits: rows.reduce((s, r) => s + (r.quote_each ?? 0) * r.qty, 0), stale: rows.some((r) => r.stale) });
 });
 
 customer.post("/me/buyback", async (c) => {

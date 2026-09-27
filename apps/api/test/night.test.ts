@@ -194,7 +194,9 @@ describe("a full night over the API", () => {
 
     // Buyback the mythic through the API.
     const q = await call("POST", "/me/buyback/quote", { token: alice.token, body: { items: [{ card_id: rare, finish: "nonfoil" }] } });
-    expect(q.body.total_credits).toBe(4050);
+    expect(q.body).toMatchObject({ total_credits: 4050, stale: false });
+    const staleQuote = await call("POST", "/me/buyback/quote", { token: alice.token, at: "2030-01-01T00:00:00Z", body: { items: [{ card_id: rare, finish: "nonfoil" }] } });
+    expect(staleQuote.body.stale).toBe(true);
     const ic = vault.cards[0].individual_card_id;
     const bb = await call("POST", "/me/buyback", { token: alice.token, body: { items: [{ individual_card_id: ic }], idempotency_key: "k1" } });
     expect(bb.body).toMatchObject({ status: "completed", total_credits: 4050 });

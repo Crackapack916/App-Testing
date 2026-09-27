@@ -30,3 +30,4 @@ jobs:
       - run: pnpm --filter @crackapack/api test
       - run: pnpm --filter @crackapack/staff exec playwright install --with-deps chromium
       - run: pnpm --filter @crackapack/staff test:e2e
+      - run: pnpm --filter @crackapack/mobile test:e2e

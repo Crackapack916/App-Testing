@@ -244,10 +244,11 @@ staff.post("/batches/:id/notify", async (c) => {
        and not exists (select 1 from queue_entries q left join pack_openings po on po.queue_entry_id = q.id
                        where q.order_id = o.id and po.contents_finalized_at is null)`, [c.req.param("id")]);
   for (const o of rows) {
-    await db.query("select notify_order($1, $2)", [o.id, c.get("user").id]);
+    const { rows: [n] } = await db.query("select notify_order($1, $2) as id", [o.id, c.get("user").id]);
+    // A failed push never blocks the night: the notification is recorded and shows in the app.
     await push.send(o.user_id, "You just cracked a pack",
       o.quantity > 1 ? `Your ${o.quantity} packs are in your vault.` : "Your pull is in your vault.",
-      { order_id: o.id, screen: "vault" });
+      { order_id: o.id, notification_id: n.id, screen: "reveal" }).catch((e) => console.error("push failed", e));
   }
   return c.json({ notified: rows.length });
 });

@@ -3,7 +3,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import pg from "pg";
 import { StripeProcessor } from "@crackapack/payments";
 import { createApp } from "./app";
-import type { PushService } from "./context";
+import { expoPush } from "./push";
 
 const env = process.env;
 const required = (k: string) => {
@@ -12,15 +12,14 @@ const required = (k: string) => {
   return v;
 };
 
-// Placeholder until Expo push tokens are stored: logs what would be sent.
-const push: PushService = {
-  async send(userId, title, body) {
-    console.log(`[push] ${userId}: ${title} / ${body}`);
-  },
-};
+const pool = new pg.Pool({ connectionString: required("DATABASE_URL"), max: 10 });
+// PUSH=log prints instead of sending (local and e2e runs).
+const push = env.PUSH === "log"
+  ? { async send(userId: string, title: string, body: string) { console.log(`[push] ${userId}: ${title} / ${body}`); } }
+  : expoPush(pool, fetch, env.EXPO_ACCESS_TOKEN);
 
 const app = createApp({
-  pool: new pg.Pool({ connectionString: required("DATABASE_URL"), max: 10 }),
+  pool,
   jwtSecret: required("JWT_SECRET"),
   payments: env.STRIPE_SECRET_KEY
     ? new StripeProcessor({

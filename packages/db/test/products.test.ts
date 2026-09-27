@@ -33,3 +33,16 @@ describe("putting a set on sale", () => {
     expect(Number((await db.one("select count(*) from price_tiers where product_id = $1", [id])).count)).toBe(2);
   });
 });
+
+describe("push tokens", () => {
+  it("registers, reassigns and rejects malformed tokens", async () => {
+    const [a] = await db.q("insert into users (email) values ('a@x.test') returning id");
+    const [b] = await db.q("insert into users (email) values ('b@x.test') returning id");
+    await db.q("select register_push_token($1, 'ExponentPushToken[abc]', 'ios')", [a.id]);
+    await db.q("select register_push_token($1, 'ExponentPushToken[abc]', 'ios')", [b.id]);
+    expect((await db.one("select user_id from push_tokens")).user_id).toBe(b.id);
+    await expect(db.q("select register_push_token($1, 'not-a-token', 'ios')", [a.id])).rejects.toThrow(/invalid_push_token/);
+    await db.q("select remove_push_token('ExponentPushToken[abc]')");
+    expect(await db.q("select * from push_tokens")).toEqual([]);
+  });
+});

@@ -43,6 +43,7 @@ const child = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {
     JWT_SECRET: "e2e-secret",
     DEV_LOGIN: "1",
     TEST_CLOCK: "1",
+    PUSH: "log",
     STAFF_DIST: resolve("dist"),
     PORT: process.env.E2E_PORT ?? "8788",
   },
