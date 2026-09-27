@@ -1,0 +1,9 @@
+{
+  "name": "crackapack",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "db:local": "bash packages/db/scripts/local-pg.sh",
+    "test": "pnpm -r test"
+  }
+}
