@@ -30,6 +30,9 @@ for (const c of cards) {
 // The customer, funded the way a completed checkout would be (through the credit ledger).
 const [alice] = await db.q("insert into users (email, display_name, age_verified_at, state_code) values ('alice@e2e.test', 'alice', now(), 'CA') returning id");
 await db.q("select record_credit_purchase($1, 5000, 'stripe', 'cs_e2e_seed')", [alice.id]);
+// A brand new customer: funded, but hasn't verified their age yet.
+const [bob] = await db.q("insert into users (email, display_name) values ('bob@e2e.test', 'bob') returning id");
+await db.q("select record_credit_purchase($1, 5000, 'stripe', 'cs_e2e_seed_bob')", [bob.id]);
 await db.pool.end();
 
 const api = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {

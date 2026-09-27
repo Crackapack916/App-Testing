@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { Button, ErrorText, Panel, Screen } from "../../components/bits";
+import { LimitsPanel } from "../../components/Limits";
 import { api } from "../../lib/api";
 import { useApi } from "../../lib/useApi";
 import { useSession } from "../../lib/session";
@@ -56,6 +57,8 @@ export default function Account() {
           </View>
           <ErrorText>{error}</ErrorText>
         </Panel>
+
+        <LimitsPanel />
 
         <Text style={s.section}>Cracked</Text>
         {notes.data?.notifications.length ? notes.data.notifications.map((n) => (

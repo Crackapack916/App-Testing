@@ -30,10 +30,43 @@ customer.use("/checkout", requireUser());
 customer.get("/me", async (c) => {
   const u = c.get("user");
   const { rows: [acct] } = await c.get("db").query(
-    `select coalesce(purchased, 0)::int as purchased, coalesce(earned, 0)::int as earned
+    `select coalesce(purchased, 0)::int as purchased, coalesce(earned, 0)::int as earned,
+            (select age_verified_at is not null from users where id = $1) as age_verified,
+            (select state_code from users where id = $1) as state
      from (select 1) x left join credit_accounts a on a.user_id = $1`, [u.id]);
-  return c.json({ id: u.id, display_name: u.display_name, role: u.role,
+  return c.json({ id: u.id, display_name: u.display_name, role: u.role, age_verified: acct.age_verified, state: acct.state,
     credits: { total: acct.purchased + acct.earned, refundable: acct.purchased, earned: acct.earned } });
+});
+
+// Age gate: birthdate and state (self attested in the pilot).
+customer.post("/me/profile", async (c) => {
+  const { birthdate, state } = await c.req.json<{ birthdate: string; state: string }>();
+  await c.get("db").query("select set_profile($1, $2, $3)", [c.get("user").id, birthdate, state]);
+  return c.json({ ok: true });
+});
+
+customer.get("/me/limits", async (c) => {
+  const id = c.get("user").id;
+  const { rows: [r] } = await c.get("db").query(
+    `select e.daily::int, e.monthly::int, e.break_until,
+            spent_on_packs($1, '24 hours')::int as spent_today, spent_on_packs($1, '30 days')::int as spent_month,
+            l.pending_daily::int, l.pending_monthly::int, l.pending_at,
+            (select max_daily_spend_credits::int from system_config) as max_daily,
+            (select max_monthly_spend_credits::int from system_config) as max_monthly
+     from effective_spend_limits($1) e left join spend_limits l on l.user_id = $1`, [id]);
+  return c.json(r);
+});
+
+customer.put("/me/limits", async (c) => {
+  const { daily, monthly } = await c.req.json<{ daily: number | null; monthly: number | null }>();
+  await c.get("db").query("select set_spend_limits($1, $2, $3)", [c.get("user").id, daily, monthly]);
+  return c.json({ ok: true });
+});
+
+customer.post("/me/break", async (c) => {
+  const { days } = await c.req.json<{ days: number }>();
+  const { rows: [r] } = await c.get("db").query("select take_break($1, $2) as until", [c.get("user").id, days]);
+  return c.json({ break_until: r.until });
 });
 
 customer.post("/orders", async (c) => {

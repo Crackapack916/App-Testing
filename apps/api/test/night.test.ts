@@ -38,7 +38,7 @@ async function call(method: string, path: string, opts: { token?: string; body?:
 }
 
 async function login(email: string, role = "customer", credits = 0) {
-  const r = await call("POST", "/dev/login", { body: { email, role, display_name: email.split("@")[0] } });
+  const r = await call("POST", "/dev/login", { body: { email, role, display_name: email.split("@")[0], verified: true } });
   if (credits) await db.q("select purchase_credits($1, $2, gen_random_uuid()::text)", [r.body.user_id, credits]);
   return r.body as { token: string; user_id: string };
 }
@@ -65,6 +65,30 @@ describe("auth", () => {
     const o = await call("POST", "/orders", { token: a.token, at: BEFORE, body: { product_id: p, quantity: 1 } });
     const r = await call("POST", `/orders/${o.body.order_id}/cancel`, { token: b.token, at: BEFORE });
     expect([r.status, r.body.error]).toEqual([404, "unknown_order"]);
+  });
+});
+
+describe("age gate and limits", () => {
+  it("makes a new customer verify their age before ordering, then enforces their limits", async () => {
+    const p = await makeProduct(db);
+    const r = await call("POST", "/dev/login", { body: { email: "new@x.test" } });
+    const token = r.body.token as string;
+    await db.q("select purchase_credits($1, 10000, 'seed')", [r.body.user_id]);
+    expect((await call("GET", "/me", { token })).body.age_verified).toBe(false);
+    let o = await call("POST", "/orders", { token, at: BEFORE, body: { product_id: p, quantity: 1 } });
+    expect([o.status, o.body.error]).toEqual([403, "age_not_verified"]);
+    const young = await call("POST", "/me/profile", { token, at: BEFORE, body: { birthdate: "2012-05-05", state: "CA" } });
+    expect([young.status, young.body.error]).toEqual([403, "underage"]);
+    await call("POST", "/me/profile", { token, at: BEFORE, body: { birthdate: "1995-05-05", state: "CA" } });
+    await call("PUT", "/me/limits", { token, at: BEFORE, body: { daily: 1000, monthly: null } });
+    expect((await call("POST", "/orders", { token, at: BEFORE, body: { product_id: p, quantity: 1 } })).status).toBe(201);
+    o = await call("POST", "/orders", { token, at: BEFORE, body: { product_id: p, quantity: 1 } });
+    expect([o.status, o.body.error]).toEqual([403, "daily_limit_reached"]);
+    const lim = (await call("GET", "/me/limits", { token, at: BEFORE })).body;
+    expect(lim).toMatchObject({ daily: 1000, spent_today: 900, max_daily: 25000 });
+    await call("POST", "/me/break", { token, at: BEFORE, body: { days: 3 } });
+    o = await call("POST", "/orders", { token, at: "2026-10-02T12:00:00-07:00", body: { product_id: p, quantity: 1 } });
+    expect(o.body.error).toBe("on_break");
   });
 });
 
@@ -201,6 +225,21 @@ describe("a full night over the API", () => {
     const bb = await call("POST", "/me/buyback", { token: alice.token, body: { items: [{ individual_card_id: ic }], idempotency_key: "k1" } });
     expect(bb.body).toMatchObject({ status: "completed", total_credits: 4050 });
     expect((await call("GET", "/me", { token: alice.token })).body.credits).toEqual({ total: 8200 + 4050, refundable: 8200, earned: 4050 });
+
+    // Bob ships his card: it leaves the customer ledger now and physical stock when staff mark it shipped.
+    const bobVault = (await call("GET", "/me/vault", { token: bob.token })).body.cards;
+    const ship = await call("POST", "/me/shipments", { token: bob.token, body: {
+      items: [{ card_id: bobVault[0].card_id, finish: bobVault[0].finish, condition: bobVault[0].condition, qty: bobVault[0].qty }],
+      address: { name: "Bob", line1: "1 K St", city: "Sacramento", state: "CA", zip: "95814" } } });
+    expect(ship.status).toBe(201);
+    const pending = (await call("GET", "/staff/shipments", { token: staff.token })).body.shipments;
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ customer: "bob", items: [expect.objectContaining({ name: bobVault[0].name })] });
+    expect((await call("POST", `/staff/shipments/${pending[0].id}/shipped`, { token: staff.token, body: { tracking: " " } })).body.error).toBe("tracking_required");
+    await call("POST", `/staff/shipments/${pending[0].id}/shipped`, { token: staff.token, body: { tracking: "9400TEST" } });
+    expect((await call("GET", "/staff/shipments", { token: staff.token })).body.shipments).toEqual([]);
+    expect((await call("POST", `/staff/shipments/${pending[0].id}/shipped`, { token: staff.token, body: { tracking: "x" } })).body.error).toBe("shipment_not_pending");
+    expect(await db.q("select * from vault_invariant_violations")).toEqual([]);
 
     // The whole night is on the custody chain.
     expect((await db.one("select verify_custody_chain() as b")).b).toBeNull();

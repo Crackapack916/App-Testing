@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { api, setApiToken } from "./api";
 import { storage } from "./storage";
 
-export type Me = { id: string; display_name: string | null; role: string; credits: { total: number; refundable: number; earned: number } };
+export type Me = { id: string; display_name: string | null; role: string; age_verified: boolean; state: string | null; credits: { total: number; refundable: number; earned: number } };
 type Session = {
   ready: boolean;
   me: Me | null;

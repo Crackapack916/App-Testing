@@ -17,6 +17,12 @@ const CODES: Record<string, [number, string]> = {
   unknown_order: [404, "Order not found."],
   order_not_cancellable: [409, "That order can't be cancelled."],
   cutoff_passed: [409, "Tonight's queue is closed. Orders lock at 7pm Pacific."],
+  underage: [403, "You must be 18 or older to order."],
+  birthdate_locked: [409, "Your birthdate is already verified. Contact support to change it."],
+  on_break: [403, "You're taking a break from ordering. It ends on the date you chose."],
+  daily_limit_reached: [403, "That order would pass your 24 hour spending limit."],
+  monthly_limit_reached: [403, "That order would pass your 30 day spending limit."],
+  invalid_break: [400, "Choose a break between 1 and 365 days."],
   // staff: batch and session
   unknown_batch: [404, "Batch not found."],
   batch_already_locked: [409, "That queue is already locked."],
@@ -48,6 +54,9 @@ const CODES: Record<string, [number, string]> = {
   price_stale: [409, "Prices are updating. Try again shortly."],
   no_items: [400, "Choose at least one card."],
   purchased_non_negative: [409, "Not enough refundable credit."],
+  // shipping
+  shipment_not_pending: [409, "That shipment has already gone out."],
+  tracking_required: [400, "Enter the tracking number."],
   // products
   unknown_set: [404, "That set isn't in the card database yet. Run the MTGJSON import."],
   unknown_product: [404, "Product not found."],

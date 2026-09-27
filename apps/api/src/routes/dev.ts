@@ -13,11 +13,12 @@ dev.post("/login", async (c) => {
   const db = c.get("db");
   const { rows: [cfg] } = await db.query("select mode from system_config");
   if (cfg.mode !== "test") throw new ApiError("forbidden");
-  const { email, role, display_name } = await c.req.json<{ email: string; role?: string; display_name?: string }>();
+  // Customers verify their own age in the app (set_profile). Tests may pass verified: true.
+  const { email, role, display_name, verified } = await c.req.json<{ email: string; role?: string; display_name?: string; verified?: boolean }>();
   const { rows: [u] } = await db.query(
-    `insert into users (email, display_name, role, age_verified_at, state_code)
-     values ($1, $2, coalesce($3, 'customer'), now(), 'CA')
+    `insert into users (email, display_name, role, age_verified_at, birthdate, state_code)
+     values ($1, $2, coalesce($3, 'customer'), case when $4 then now() end, case when $4 then date '1990-01-01' end, case when $4 then 'CA' end)
      on conflict (email) do update set display_name = coalesce(excluded.display_name, users.display_name)
-     returning id, role`, [email, display_name ?? null, role ?? null]);
+     returning id, role`, [email, display_name ?? null, role ?? null, verified === true]);
   return c.json({ token: await issueToken(u.id, c.get("services").jwtSecret), user_id: u.id, role: u.role });
 });

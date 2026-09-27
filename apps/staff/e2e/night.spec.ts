@@ -95,3 +95,31 @@ test("put a set on sale: create, receive a box, turn it on", async ({ page }) =>
   await expect(card).toContainText("On sale");
   await shot(page, "5-stock");
 });
+
+test("ship a customer's cards: pick list, tracking, mark shipped", async ({ page, request }) => {
+  // Alice (from the night above) asks to ship her commons.
+  const api = "http://localhost:8788";
+  const alice = await (await request.post(`${api}/dev/login`, { data: { email: "alice@e2e.test" } })).json();
+  const auth = { authorization: `Bearer ${alice.token}`, "x-test-now": "2026-10-01T21:00:00-07:00" };
+  const vault = await (await request.get(`${api}/me/vault`, { headers: auth })).json();
+  const common = vault.cards.find((c: any) => c.collector_number === "7");
+  const r = await request.post(`${api}/me/shipments`, { headers: auth, data: {
+    items: [{ card_id: common.card_id, finish: common.finish, condition: common.condition, qty: common.qty }],
+    address: { name: "Alice Doe", line1: "1 Capitol Mall", city: "Sacramento", state: "CA", zip: "95814" } } });
+  expect(r.status()).toBe(201);
+
+  await page.goto("/ops/");
+  await setTime(page, "2026-10-02T09:00:00-07:00");
+  await page.getByPlaceholder("staff email").fill("ops@e2e.test");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("button", { name: /Ship/ })).toBeVisible();
+  await page.keyboard.press("p");
+  const card = page.locator("[data-testid^=shipment-]");
+  await expect(card).toContainText("alice");
+  await expect(card).toContainText("Alice Doe");
+  await expect(card).toContainText("Card 7");
+  await shot(page, "6-ship");
+  await card.getByTestId("tracking").fill("9400111202555842761234");
+  await card.getByTestId("mark-shipped").click();
+  await expect(page.getByText("No shipments waiting.")).toBeVisible();
+});

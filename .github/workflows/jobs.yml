@@ -1,0 +1,26 @@
+name: jobs
+# Locks queues at the cutoff and releases held buybacks. See packages/db/scripts/jobs.ts.
+# Requires the repository secret NEON_DATABASE_URL.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency: scheduled-jobs
+    env:
+      DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+    steps:
+      - name: Check secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::Add the NEON_DATABASE_URL repository secret"; exit 1; fi
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @crackapack/db exec tsx scripts/jobs.ts

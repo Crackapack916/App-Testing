@@ -253,6 +253,34 @@ staff.post("/batches/:id/notify", async (c) => {
   return c.json({ notified: rows.length });
 });
 
+// Shipping ------------------------------------------------------------------------------
+
+staff.get("/shipments", async (c) => {
+  const status = c.req.query("status") ?? "requested";
+  const { rows } = await c.get("db").query(
+    `select sr.id, sr.status, sr.address, sr.value_cents::int, sr.fee_credits::int, sr.created_at, sr.shipped_at, sr.tracking_ref,
+            coalesce(u.display_name, split_part(u.email, '@', 1)) as customer,
+            (select json_agg(json_build_object(
+                'line', si.line, 'qty', si.qty, 'finish', si.finish, 'condition', si.condition,
+                'name', cd.name, 'set_code', cd.set_code, 'collector_number', cd.collector_number, 'rarity', cd.rarity,
+                'individual', si.individual_card_id is not null,
+                'bin', coalesce(ic.bin, l.bin)) order by coalesce(ic.bin, l.bin) nulls last, cd.set_code, cd.collector_number)
+             from shipment_items si join cards cd on cd.id = si.card_id
+             left join individual_cards ic on ic.id = si.individual_card_id
+             left join inventory_lots l on l.card_id = si.card_id and l.finish = si.finish and l.condition = si.condition
+             where si.shipment_id = sr.id) as items
+     from shipment_requests sr join users u on u.id = sr.user_id
+     where sr.status = $1 order by sr.created_at limit 100`, [status]);
+  return c.json({ shipments: rows });
+});
+
+staff.post("/shipments/:id/shipped", async (c) => {
+  const { tracking } = await c.req.json<{ tracking: string }>();
+  if (!tracking?.trim()) throw new ApiError("tracking_required", 400);
+  await c.get("db").query("select mark_shipped($1, $2)", [c.req.param("id"), tracking.trim()]);
+  return c.json({ ok: true });
+});
+
 // Stock and catalog --------------------------------------------------------------------
 
 staff.get("/products", async (c) => {
