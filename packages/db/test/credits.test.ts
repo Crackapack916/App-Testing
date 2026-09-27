@@ -61,3 +61,34 @@ describe("credits", () => {
     await expect(db.q("delete from credit_entries where user_id = $1", [u])).rejects.toThrow(/append_only/);
   });
 });
+
+describe("processor agnostic payments", () => {
+  it("dedupes per processor and payment reference", async () => {
+    const u = await makeUser(db);
+    const apply = (proc: string, ref: string) =>
+      db.one("select record_credit_purchase($1, 900, $2, $3) as ok", [u, proc, ref]).then((r) => r.ok);
+    expect(await apply("stripe", "cs_1")).toBe(true);
+    expect(await apply("stripe", "cs_1")).toBe(false);
+    expect(await apply("paymentcloud", "cs_1")).toBe(true); // same ref, different processor
+    expect(await balance(u)).toEqual({ purchased: 1800, earned: 0 });
+  });
+
+  it("refunds only unspent purchased credit, once per refund", async () => {
+    const p = await makeProduct(db);
+    const u = await makeUser(db, { credits: 2000 });
+    await db.q("insert into credit_entries (user_id, bucket, amount, kind) values ($1, 'earned', 5000, 'buyback')", [u]);
+    await order(u, p, 1); // spends earned first
+    expect(Number((await db.one("select refundable_credits($1) as r", [u])).r)).toBe(2000);
+
+    const refund = (amt: number, ref: string) => db.one("select refund_purchased_credits($1, $2, 'stripe', $3) as ok", [u, amt, ref]);
+    expect((await refund(500, "re_1")).ok).toBe(true);
+    expect((await refund(500, "re_1")).ok).toBe(false);
+    await expect(refund(1600, "re_2")).rejects.toThrow(/purchased_non_negative/);
+    expect(await balance(u)).toEqual({ purchased: 1500, earned: 4100 });
+  });
+
+  it("keeps payment events append only", async () => {
+    await db.q("insert into payment_events (processor, event_id, event_type, status) values ('stripe', 'evt_1', 'x', 'ignored')");
+    await expect(db.q("update payment_events set status = 'applied'")).rejects.toThrow(/append_only/);
+  });
+});

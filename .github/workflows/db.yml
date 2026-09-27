@@ -25,3 +25,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @crackapack/db exec tsc --noEmit -p .
       - run: pnpm --filter @crackapack/db test
+      - run: pnpm --filter @crackapack/payments exec tsc --noEmit -p .
+      - run: pnpm --filter @crackapack/payments test
