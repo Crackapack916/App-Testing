@@ -256,9 +256,40 @@ staff.post("/batches/:id/notify", async (c) => {
 
 staff.get("/products", async (c) => {
   const { rows } = await c.get("db").query(
-    `select p.*, s.name as set_name, st.packs_on_hand, st.packs_reserved
-     from products p join mtg_sets s on s.code = p.set_code left join product_stock st on st.product_id = p.id order by s.name`);
+    `select p.*, s.name as set_name, st.packs_on_hand, st.packs_reserved,
+            (select count(*) from sealed_boxes x where x.product_id = p.id and x.status = 'sealed')::int as sealed_boxes,
+            (select json_agg(json_build_object('min_qty', t.min_qty, 'per_pack_credits', t.per_pack_credits) order by t.min_qty)
+             from price_tiers t where t.product_id = p.id) as ladder
+     from products p join mtg_sets s on s.code = p.set_code left join product_stock st on st.product_id = p.id
+     order by p.active desc, s.release_date desc nulls last, s.name`);
   return c.json({ products: rows });
+});
+
+staff.get("/sets", async (c) => {
+  const q = c.req.query("q") ?? "";
+  const { rows } = await c.get("db").query(
+    `select code, name, release_date::text from mtg_sets
+     where code ilike $1 || '%' or name ilike '%' || $1 || '%' order by release_date desc nulls last limit 20`, [q]);
+  return c.json({ sets: rows });
+});
+
+staff.post("/products", async (c) => {
+  const b = await c.req.json<{ set_code: string; booster_type?: string; name?: string; ladder?: unknown[] }>();
+  const { rows: [r] } = await c.get("db").query("select create_product($1, $2, $3, $4, $5) as id",
+    [b.set_code, b.booster_type ?? "play", b.name ?? null, b.ladder ? JSON.stringify(b.ladder) : null, c.get("user").id]);
+  return c.json({ product_id: r.id }, 201);
+});
+
+staff.put("/products/:id/ladder", async (c) => {
+  const { ladder } = await c.req.json<{ ladder: unknown[] }>();
+  await c.get("db").query("select set_price_ladder($1, $2)", [c.req.param("id"), JSON.stringify(ladder)]);
+  return c.json({ ok: true });
+});
+
+staff.post("/products/:id/active", async (c) => {
+  const { active } = await c.req.json<{ active: boolean }>();
+  await c.get("db").query("select set_product_active($1, $2, $3)", [c.req.param("id"), active, c.get("user").id]);
+  return c.json({ ok: true });
 });
 
 staff.post("/boxes", async (c) => {

@@ -93,3 +93,7 @@ td.foil { background: linear-gradient(90deg, #ff9ad5, #a0e7ff, #fff3a0, #b7ffb0)
   .next { grid-template-columns: 1fr; } .next .pos { font-size: 56px; }
   button.huge { min-width: 0; width: 100%; }
 }
+
+select { font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+input.small { width: 90px; text-align: right; }
+.row-between { display: flex; justify-content: space-between; align-items: center; gap: 12px; }

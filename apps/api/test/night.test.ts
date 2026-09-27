@@ -82,6 +82,37 @@ describe("errors", () => {
   });
 });
 
+describe("catalog and products", () => {
+  it("puts a set on sale from the staff API", async () => {
+    await db.q("insert into mtg_sets (code, name) values ('EOE', 'Edge of Eternities')");
+    const staff = await login("ops@x.test", "staff");
+    const bad = await call("POST", "/staff/products", { token: staff.token, body: { set_code: "ZZZ" } });
+    expect([bad.status, bad.body.error]).toEqual([404, "unknown_set"]);
+    const { product_id } = (await call("POST", "/staff/products", { token: staff.token, body: { set_code: "eoe" } })).body;
+    const lad = await call("PUT", `/staff/products/${product_id}/ladder`, { token: staff.token, body: { ladder: [{ min_qty: 1, per_pack_credits: 900 }, { min_qty: 3, per_pack_credits: 950 }] } });
+    expect(lad.body.error).toBe("ladder_not_decreasing");
+    await call("POST", "/staff/boxes", { token: staff.token, body: { product_id, label: "EOE-1", pack_count: 30 } });
+    expect((await call("GET", "/storefront", { at: BEFORE })).body.products).toEqual([]);
+    await call("POST", `/staff/products/${product_id}/active`, { token: staff.token, body: { active: true } });
+    const store = (await call("GET", "/storefront", { at: BEFORE })).body.products;
+    expect(store[0]).toMatchObject({ name: "Edge of Eternities Play Booster", available: true, available_packs: 29 });
+    expect(store[0].ladder.map((t: any) => t.per_pack_credits)).toEqual([900, 850, 825, 800, 775]);
+  });
+
+  it("searches cards with images and legality, and lists big pulls without names or prices", async () => {
+    const bolt = await makeCard(db, { set: "FDN", num: "1", rarity: "common", priceCents: 125 });
+    await db.q("update cards set name = 'Lightning Bolt', legalities = '{\"modern\":\"Legal\"}' where id = $1", [bolt]);
+    await db.q("insert into card_external_ids values ('scryfall', 'abcdef12-0000', $1)", [bolt]);
+    const r = (await call("GET", "/cards/search?q=bolt")).body.cards;
+    expect(r[0]).toMatchObject({ name: "Lightning Bolt", legalities: { modern: "Legal" }, prices: { nonfoil: 125 },
+      image_url: "https://cards.scryfall.io/normal/front/a/b/abcdef12-0000.jpg" });
+    expect(r[0].scryfall_id).toBeUndefined();
+    expect((await call("GET", `/cards/${bolt}`)).body.card.name).toBe("Lightning Bolt");
+    expect((await call("GET", "/cards/search?q=b")).body.cards).toEqual([]);
+    expect((await call("GET", "/feed/big-pulls")).body.pulls).toEqual([]);
+  });
+});
+
 describe("a full night over the API", () => {
   it("orders, locks, opens in strict order, logs, notifies, and shows the pulls", async () => {
     const p = await makeProduct(db, { setCode: "FDN" });
@@ -171,5 +202,10 @@ describe("a full night over the API", () => {
 
     // The whole night is on the custody chain.
     expect((await db.one("select verify_custody_chain() as b")).b).toBeNull();
+
+    // The mythic shows in the public feed with no customer name and no price.
+    const feed = (await call("GET", "/feed/big-pulls", { at: DURING(9) })).body.pulls;
+    expect(feed.map((f: any) => f.name)).toEqual(["Card 101"]);
+    for (const k of ["customer", "display_name", "email", "user_id", "prices", "market_cents"]) expect(feed[0]).not.toHaveProperty(k);
   });
 });

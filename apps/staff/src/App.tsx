@@ -5,6 +5,7 @@ import { Tonight } from "./screens/Tonight";
 import { Session } from "./screens/Session";
 import { LogCards } from "./screens/LogCards";
 import { Notify } from "./screens/Notify";
+import { Stock } from "./screens/Stock";
 
 export type TonightData = {
   now: string;
@@ -22,6 +23,7 @@ const TABS = [
   { key: "s", id: "session", label: "Session" },
   { key: "l", id: "log", label: "Log cards" },
   { key: "n", id: "notify", label: "Notify" },
+  { key: "k", id: "stock", label: "Stock" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -60,6 +62,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
         {tab === "session" && <Session batch={batch} reload={tonight.reload} />}
         {tab === "log" && <LogCards batch={batch} />}
         {tab === "notify" && <Notify batch={batch} />}
+        {tab === "stock" && <Stock />}
       </main>
     </div>
   );

@@ -76,3 +76,22 @@ test("a full night: lock, film in strict order, log cards, notify", async ({ pag
   await expect(page.getByTestId("ready")).toHaveText("0");
   await expect(page.getByTestId("orders").locator("tbody tr td:last-child")).toHaveText(["notified", "notified"]);
 });
+
+test("put a set on sale: create, receive a box, turn it on", async ({ page }) => {
+  await page.goto("/ops/");
+  await setTime(page, "2026-10-02T09:00:00-07:00");
+  await page.getByPlaceholder("staff email").fill("ops@e2e.test");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("button", { name: /Stock/ })).toBeVisible();
+  await page.keyboard.press("k");
+  await page.getByTestId("set-search").fill("Edge");
+  await page.getByTestId("set-EOE").click();
+  const card = page.getByTestId("product-EOE");
+  await expect(card).toContainText("Off sale");
+  await card.getByTestId("box-label").fill("EOE-0001");
+  await card.getByTestId("receive").click();
+  await expect(card.getByTestId("sellable")).toHaveText("29");
+  await card.getByTestId("toggle").click();
+  await expect(card).toContainText("On sale");
+  await shot(page, "5-stock");
+});

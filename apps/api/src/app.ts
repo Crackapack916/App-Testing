@@ -6,6 +6,7 @@ import { customer } from "./routes/customer";
 import { staff } from "./routes/staff";
 import { webhooks } from "./routes/webhooks";
 import { dev } from "./routes/dev";
+import { cards } from "./routes/cards";
 
 export function createApp(services: Services) {
   const app = new Hono<Env>();
@@ -33,6 +34,7 @@ export function createApp(services: Services) {
   });
 
   app.get("/health", (c) => c.json({ ok: true }));
+  app.route("/", cards);
   app.route("/", customer);
   app.route("/staff", staff);
   app.route("/webhooks", webhooks);

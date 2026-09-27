@@ -22,6 +22,7 @@ const at = (t: string, sql: string, params: unknown[]) =>
   });
 
 const product = await makeProduct(db, { setCode: "FDN", boxes: 2 });
+await db.q("insert into mtg_sets (code, name, release_date) values ('EOE', 'Edge of Eternities', '2025-08-01')");
 await makeCard(db, { set: "FDN", num: "101", rarity: "mythic", priceCents: 4500 });
 await makeCard(db, { set: "FDN", num: "7", rarity: "common", priceCents: 8 });
 await makeCard(db, { set: "FDN", num: "55", rarity: "uncommon", priceCents: 25, foilPriceCents: 90 });

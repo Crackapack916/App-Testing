@@ -21,7 +21,8 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 
 ## Apps
 * `apps/api`: Hono API. Customer routes at `/`, staff routes at `/staff` (staff role), processor webhooks at `/webhooks/:processor`. Database codes become HTTP responses only in `src/errors.ts`. `DEV_LOGIN=1` and `TEST_CLOCK=1` (X-Test-Now header) are pilot only and refused by a live database.
-* `apps/staff`: the nightly ops tool (Vite + React), served by the API at `/ops`. Keys: T/S/L/N switch screens; Space cracks the next pack; B opens the next sealed box; V voids; collector number + Enter logs a card (`f`/`e` suffix for foil/etched); Ctrl+Enter finalizes a pack.
+* `apps/staff`: the nightly ops tool (Vite + React), served by the API at `/ops`. Keys: T/S/L/N/K switch screens (K = Stock: put a set on sale, price ladder, receive boxes); Space cracks the next pack; B opens the next sealed box; V voids; collector number + Enter logs a card (`f`/`e` suffix for foil/etched); Ctrl+Enter finalizes a pack.
+* Card images come from Scryfall's CDN via `apps/api/src/images.ts` only; never copied or proxied. The public big pulls feed never shows customer names or prices.
 * Clips: an order's clip runs from 2s before its first pack to when the next order's first pack is opened (or the session ends). Pilot clips are media fragments into the session recording (`<stream>#t=start,end`).
 
 ## Commands

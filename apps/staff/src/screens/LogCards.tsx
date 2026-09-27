@@ -36,13 +36,13 @@ export function LogCards({ batch }: { batch: TonightData["batch"] }) {
         </ul>
       </section>
       {current
-        ? <PackEditor key={current.id} pack={current} onFinalized={() => { setSelected(null); packs.reload(); }} onChange={packs.reload} />
+        ? <PackEditor key={current.id} pack={current} onFinalized={async () => { await packs.reload(); setSelected(null); }} onChange={packs.reload} />
         : <section className="panel grow"><p className="muted">All opened packs are logged.</p></section>}
     </div>
   );
 }
 
-function PackEditor({ pack, onFinalized, onChange }: { pack: Pack; onFinalized: () => void; onChange: () => void }) {
+function PackEditor({ pack, onFinalized, onChange }: { pack: Pack; onFinalized: () => Promise<void>; onChange: () => void }) {
   const cards = useData<{ cards: Logged[] }>(`/staff/packs/${pack.id}`);
   const [entry, setEntry] = useState("");
   const { busy, error, run, setError } = useAction();
@@ -52,7 +52,9 @@ function PackEditor({ pack, onFinalized, onChange }: { pack: Pack; onFinalized: 
   const final = !!pack.contents_finalized_at;
   const total = logged.reduce((s, c) => s + (c.market_cents ?? 0), 0);
 
-  useEffect(() => { input.current?.focus(); }, [pack.id]);
+  // Keystrokes are only accepted once this pack's slots are loaded, so the next slot is known.
+  const ready = !!cards.data && !busy;
+  useEffect(() => { if (ready) input.current?.focus(); }, [pack.id, ready]);
 
   const add = () => run(async () => {
     // A trailing f or e is the finish; other letters stay part of the number (e.g. 123a).
@@ -67,7 +69,8 @@ function PackEditor({ pack, onFinalized, onChange }: { pack: Pack; onFinalized: 
     onChange();
   });
   const remove = (slot: number) => run(async () => { await api("DELETE", `/staff/packs/${pack.id}/cards/${slot}`); await cards.reload(); onChange(); });
-  const finalize = () => run(async () => { await api("POST", `/staff/packs/${pack.id}/finalize`); onFinalized(); });
+  // Stays busy until the list has moved on, so nothing typed lands on the finalized pack.
+  const finalize = () => run(async () => { await api("POST", `/staff/packs/${pack.id}/finalize`); await onFinalized(); });
 
   return (
     <section className="panel grow">
@@ -75,7 +78,7 @@ function PackEditor({ pack, onFinalized, onChange }: { pack: Pack; onFinalized: 
       {!final && (
         <div className="entry">
           <span className="set">{pack.set_code}</span>
-          <input ref={input} data-testid="collector" value={entry} disabled={busy} placeholder={`slot ${nextSlot}: collector #`}
+          <input ref={input} data-testid="collector" value={entry} disabled={!ready} placeholder={`slot ${nextSlot}: collector #`}
             onChange={(e) => setEntry(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); finalize(); }
