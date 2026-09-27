@@ -1,4 +1,4 @@
-name: db
+name: ci
 on:
   push:
   pull_request:
@@ -23,7 +23,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @crackapack/db exec tsc --noEmit -p .
+      - run: pnpm typecheck
       - run: pnpm --filter @crackapack/db test
-      - run: pnpm --filter @crackapack/payments exec tsc --noEmit -p .
       - run: pnpm --filter @crackapack/payments test
+      - run: pnpm --filter @crackapack/api test
+      - run: pnpm --filter @crackapack/staff exec playwright install --with-deps chromium
+      - run: pnpm --filter @crackapack/staff test:e2e

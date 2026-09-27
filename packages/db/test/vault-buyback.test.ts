@@ -157,3 +157,12 @@ describe("free shipping threshold", () => {
     expect(await bal()).toBe(start - 499);
   });
 });
+
+describe("clear_pack_card", () => {
+  it("removes a mis-logged card before finalize and refuses after", async () => {
+    const u = await makeUser(db, { credits: 2000 });
+    const c = await makeCard(db, { priceCents: 5 });
+    const po = await pull(u, [{ card: c }]);
+    await expect(db.q("select clear_pack_card($1, 1)", [po])).rejects.toThrow(/pack_contents_finalized/);
+  });
+});

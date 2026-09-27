@@ -17,11 +17,18 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 * Processors plug in through `PaymentProcessor` in `packages/payments`. Webhooks go through `handleWebhook`, which writes only via `record_credit_purchase` and `refund_purchased_credits`.
 * Mode is `test` until counsel clears the structure.
 
+## Apps
+* `apps/api`: Hono API. Customer routes at `/`, staff routes at `/staff` (staff role), processor webhooks at `/webhooks/:processor`. Database codes become HTTP responses only in `src/errors.ts`. `DEV_LOGIN=1` and `TEST_CLOCK=1` (X-Test-Now header) are pilot only and refused by a live database.
+* `apps/staff`: the nightly ops tool (Vite + React), served by the API at `/ops`. Keys: T/S/L/N switch screens; Space cracks the next pack; B opens the next sealed box; V voids; collector number + Enter logs a card (`f`/`e` suffix for foil/etched); Ctrl+Enter finalizes a pack.
+* Clips: an order's clip runs from 2s before its first pack to when the next order's first pack is opened (or the session ends). Pilot clips are media fragments into the session recording (`<stream>#t=start,end`).
+
 ## Commands
 * `pnpm db:local` starts a local Postgres 16 and prints its URL (the session start hook runs this automatically on the web)
 * `pnpm typecheck` typechecks every package
 * `pnpm --filter @crackapack/db test` runs the database suite (migrations + invariants)
 * `pnpm --filter @crackapack/payments test` runs the payments suite (needs the local Postgres)
+* `pnpm --filter @crackapack/api test` runs the API suite, including a full night over HTTP
+* `pnpm --filter @crackapack/staff test:e2e` runs the Playwright night in a real browser (`SCREENSHOTS=<dir>` saves the key screens)
 
 ## Conventions
 * Follow `.claude/skills/db-change` for any schema or function change.

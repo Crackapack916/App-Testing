@@ -1,0 +1,78 @@
+import { expect, test, type Page } from "@playwright/test";
+
+/** Set SCREENSHOTS=<dir> to save the key screens while the test runs. */
+async function shot(page: Page, name: string) {
+  if (process.env.SCREENSHOTS) await page.screenshot({ path: `${process.env.SCREENSHOTS}/${name}.png` });
+}
+
+/** Pins the server clock (test mode only) for every request the tool makes. */
+async function setTime(page: Page, iso: string) {
+  await page.evaluate((t) => localStorage.setItem("crackapack.testNow", t), iso);
+}
+
+test("a full night: lock, film in strict order, log cards, notify", async ({ page }) => {
+  await page.goto("/ops/");
+  await setTime(page, "2026-10-01T19:02:00-07:00");
+  await page.getByPlaceholder("staff email").fill("ops@e2e.test");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  // Tonight: provisional queue, then lock.
+  const queue = page.getByTestId("queue");
+  await expect(queue.locator("tbody tr")).toHaveCount(3);
+  await expect(queue.locator("tbody tr td:nth-child(2)")).toHaveText(["alice", "alice", "bob"]);
+  await page.getByTestId("lock").click();
+  await expect(page.getByTestId("manifest")).toHaveText(/^[0-9a-f]{64}$/);
+  await expect(queue.locator("tbody tr td:first-child")).toHaveText(["1", "2", "3"]);
+  await shot(page, "1-tonight-locked");
+
+  // Start the filmed session.
+  await setTime(page, "2026-10-01T19:10:00-07:00");
+  await page.getByLabel("Stream or recording URL").fill("https://stream.e2e/night.m3u8");
+  await page.getByTestId("start").click();
+
+  // Session: B opens the box on camera, Space cracks the next pack in queue order.
+  const next = page.getByTestId("next");
+  await expect(next).toContainText("#1");
+  await expect(next).toContainText("alice");
+  await setTime(page, "2026-10-01T19:11:00-07:00");
+  await page.keyboard.press("b");
+  await expect(page.getByTestId("open-pack")).toBeVisible();
+  await shot(page, "2-session");
+  for (const [i, who] of [["2", "alice"], ["3", "bob"]] as const) {
+    await setTime(page, `2026-10-01T19:1${Number(i) + 1}:00-07:00`);
+    await page.keyboard.press("Space");
+    await expect(next).toContainText(`#${i}`);
+    await expect(next).toContainText(who);
+  }
+  await setTime(page, "2026-10-01T19:15:00-07:00");
+  await page.keyboard.press("Space");
+  await expect(page.getByText("Queue complete")).toBeVisible();
+  await page.getByTestId("complete").click();
+
+  // Log cards: collector numbers only, "f" suffix for foil, Ctrl+Enter finalizes.
+  await page.keyboard.press("l");
+  const collector = page.getByTestId("collector");
+  await collector.fill("999");
+  await collector.press("Enter");
+  await expect(page.getByText("No FDN #999.")).toBeVisible();
+  for (let pack = 0; pack < 3; pack++) {
+    for (const entry of ["101", "7", "55f"]) {
+      await collector.fill(entry);
+      await collector.press("Enter");
+      await expect(collector).toHaveValue("");
+    }
+    await expect(page.getByTestId("contents").locator("tbody tr")).toHaveCount(3);
+    await expect(page.getByTestId("contents")).toContainText("foil");
+    if (pack === 0) await shot(page, "3-log-cards");
+    await collector.press("Control+Enter");
+  }
+  await expect(page.getByText("All opened packs are logged.")).toBeVisible();
+
+  // Notify: both orders are ready.
+  await page.keyboard.press("n");
+  await expect(page.getByTestId("ready")).toHaveText("2");
+  await shot(page, "4-notify");
+  await page.getByTestId("notify").click();
+  await expect(page.getByTestId("ready")).toHaveText("0");
+  await expect(page.getByTestId("orders").locator("tbody tr td:last-child")).toHaveText(["notified", "notified"]);
+});
