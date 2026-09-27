@@ -14,3 +14,4 @@ description: Standard format for any CrackAPack database change, a new migration
 7. **Errors**: `raise exception 'snake_case_code'`.
 8. **Tests** go in `packages/db/test/<area>.test.ts` using `freshDb()`, fixtures from `fixtures.ts`, and `atTime()` to pin the clock. Every invariant needs one test proving the happy path and one proving the violation is rejected. Concurrency sensitive code needs a parallel test.
 9. Run `pnpm --filter @crackapack/db test` and typecheck before committing.
+10. **Apply to Neon** (project `calm-art-68010363`). With a direct connection: `pnpm --filter @crackapack/db migrate`. Without one: `node packages/db/scripts/split-statements.mjs packages/db/migrations <dir>`, pass each new file's array to the Neon MCP `run_sql_transaction`, then confirm the schema fingerprint matches a local database.

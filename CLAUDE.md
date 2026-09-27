@@ -11,6 +11,10 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 * Business logic reads time from `app_now()`, never `now()`. The override works only in test mode.
 * 1 credit = $0.01. Store money as integer credits or cents, never floats.
 
+## Infrastructure
+* Database: Neon project `calm-art-68010363` (us-west-2, Postgres 16). Connection string lives in `.env`, never committed.
+* Mode is `test` until counsel clears the structure.
+
 ## Commands
 * `pnpm db:local` starts a local Postgres 16 and prints its URL
 * `pnpm --filter @crackapack/db test` runs the database suite (migrations + invariants)

@@ -141,3 +141,19 @@ describe("shipping", () => {
     expect(await db.q("select * from vault_invariant_violations")).toEqual([]);
   });
 });
+
+describe("free shipping threshold", () => {
+  it("ships free at $50 of card value and charges the fee just below it", async () => {
+    const u = await makeUser(db, { credits: 2000 });
+    const c = await makeCard(db, { rarity: "rare", priceCents: 1000 }); // $10 each, pooled
+    await pull(u, [{ card: c }, { card: c }, { card: c }, { card: c }, { card: c }]);
+    const bal = async () => (await db.one("select purchased::int from credit_accounts where user_id = $1", [u])).purchased;
+    const start = await bal();
+    const item = (qty: number) => JSON.stringify([{ card_id: c, finish: "nonfoil", qty }]);
+    await run("select request_shipment($1, $2, '{}')", [u, item(4)]); // $40
+    expect(await bal()).toBe(start - 499);
+    await db.q("insert into vault_entries (user_id, card_id, finish, condition, qty_delta, reason) values ($1, $2, 'nonfoil', 'NM', 4, 'adjustment')", [u, c]);
+    await run("select request_shipment($1, $2, '{}')", [u, item(5)]); // $50
+    expect(await bal()).toBe(start - 499);
+  });
+});
