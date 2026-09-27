@@ -1,0 +1,36 @@
+name: mtgjson
+# Loads MTGJSON into Neon. Prices daily; the full card catalog weekly or on demand.
+# Requires the repository secret NEON_DATABASE_URL (Neon direct connection string).
+on:
+  schedule:
+    - cron: "17 13 * * *"   # daily, about 6am Pacific: prices
+    - cron: "47 12 * * 1"   # Mondays, before prices: full card catalog
+  workflow_dispatch:
+    inputs:
+      cards:
+        description: "Also import every card (AllPrintings)"
+        type: boolean
+        default: true
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency: mtgjson-import
+    env:
+      DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+    steps:
+      - name: Check secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::Add the NEON_DATABASE_URL repository secret"; exit 1; fi
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Import cards
+        if: github.event.schedule == '47 12 * * 1' || inputs.cards
+        run: pnpm --filter @crackapack/catalog import --printings
+      - name: Import prices
+        run: pnpm --filter @crackapack/catalog import --prices

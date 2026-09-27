@@ -26,6 +26,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm --filter @crackapack/db test
       - run: pnpm --filter @crackapack/payments test
+      - run: pnpm --filter @crackapack/catalog test
       - run: pnpm --filter @crackapack/api test
       - run: pnpm --filter @crackapack/staff exec playwright install --with-deps chromium
       - run: pnpm --filter @crackapack/staff test:e2e

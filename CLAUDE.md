@@ -17,6 +17,8 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 * Processors plug in through `PaymentProcessor` in `packages/payments`. Webhooks go through `handleWebhook`, which writes only via `record_credit_purchase` and `refund_purchased_credits`.
 * Mode is `test` until counsel clears the structure.
 
+* Card data: `packages/catalog` imports MTGJSON (AllPrintings, AllPricesToday) through `import_sets`, `import_cards` and `import_prices`. Cards match on (set, collector number) so internal ids never change. Price history is kept only for sets we sell and cards someone holds. Runs from `.github/workflows/mtgjson.yml` (needs the `NEON_DATABASE_URL` secret); this container cannot reach mtgjson.com.
+
 ## Apps
 * `apps/api`: Hono API. Customer routes at `/`, staff routes at `/staff` (staff role), processor webhooks at `/webhooks/:processor`. Database codes become HTTP responses only in `src/errors.ts`. `DEV_LOGIN=1` and `TEST_CLOCK=1` (X-Test-Now header) are pilot only and refused by a live database.
 * `apps/staff`: the nightly ops tool (Vite + React), served by the API at `/ops`. Keys: T/S/L/N switch screens; Space cracks the next pack; B opens the next sealed box; V voids; collector number + Enter logs a card (`f`/`e` suffix for foil/etched); Ctrl+Enter finalizes a pack.
@@ -27,6 +29,7 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 * `pnpm typecheck` typechecks every package
 * `pnpm --filter @crackapack/db test` runs the database suite (migrations + invariants)
 * `pnpm --filter @crackapack/payments test` runs the payments suite (needs the local Postgres)
+* `pnpm --filter @crackapack/catalog test` runs the MTGJSON import suite against fixtures in MTGJSON's format
 * `pnpm --filter @crackapack/api test` runs the API suite, including a full night over HTTP
 * `pnpm --filter @crackapack/staff test:e2e` runs the Playwright night in a real browser (`SCREENSHOTS=<dir>` saves the key screens)
 
