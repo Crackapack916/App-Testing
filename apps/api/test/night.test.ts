@@ -15,6 +15,7 @@ beforeEach(async () => {
     jwtSecret: "test-secret",
     push: { send: async (userId, title) => { pushed.push({ userId, title }); } },
     devLogin: true,
+    devStaffEmails: ["ops@x.test"],
     testClock: true,
   });
 });
@@ -51,6 +52,20 @@ describe("auth", () => {
     expect((await call("GET", "/me", { token: cust.token })).status).toBe(200);
     const r = await call("GET", "/staff/tonight", { token: cust.token });
     expect([r.status, r.body.error]).toEqual([403, "forbidden"]);
+  });
+
+  it("never lets dev login grant staff to an email that isn't allowlisted", async () => {
+    const r = await call("POST", "/dev/login", { body: { email: "mallory@x.test", role: "staff" } });
+    expect([r.status, r.body.error]).toEqual([403, "forbidden"]);
+    const admin = await call("POST", "/dev/login", { body: { email: "mallory@x.test", role: "admin" } });
+    expect(admin.status).toBe(403);
+    expect(await db.q("select role from users where email = 'mallory@x.test'")).toEqual([]);
+  });
+
+  it("rejects oversized requests", async () => {
+    const u = await login("big@x.test");
+    const r = await call("POST", "/me/shipments", { token: u.token, body: { items: [], address: { name: "x".repeat(300_000) } } });
+    expect(r.status).toBe(413);
   });
 
   it("refuses dev login once the database is live", async () => {

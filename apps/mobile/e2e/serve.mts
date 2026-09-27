@@ -37,7 +37,7 @@ await db.pool.end();
 
 const api = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {
   stdio: "inherit",
-  env: { ...process.env, DATABASE_URL: db.url, JWT_SECRET: "e2e", DEV_LOGIN: "1", TEST_CLOCK: "1", PUSH: "log", PORT: String(API_PORT) },
+  env: { ...process.env, DATABASE_URL: db.url, JWT_SECRET: "e2e", DEV_LOGIN: "1", TEST_CLOCK: "1", PUSH: "log", DEV_STAFF_EMAILS: "ops@e2e.test", PORT: String(API_PORT) },
 });
 
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png",

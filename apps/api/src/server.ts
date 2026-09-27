@@ -12,6 +12,12 @@ const required = (k: string) => {
   return v;
 };
 
+// Pilot conveniences must never reach a production server: dev login signs anyone in
+// as any email, and the test clock would let a customer order after the cutoff.
+if (env.NODE_ENV === "production" && (env.DEV_LOGIN === "1" || env.TEST_CLOCK === "1")) {
+  throw new Error("DEV_LOGIN and TEST_CLOCK are not allowed when NODE_ENV=production");
+}
+
 const pool = new pg.Pool({ connectionString: required("DATABASE_URL"), max: 10 });
 // PUSH=log prints instead of sending (local and e2e runs).
 const push = env.PUSH === "log"
@@ -30,6 +36,7 @@ const app = createApp({
     : undefined,
   push,
   devLogin: env.DEV_LOGIN === "1",
+  devStaffEmails: (env.DEV_STAFF_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean),
   testClock: env.TEST_CLOCK === "1",
 });
 

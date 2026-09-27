@@ -12,6 +12,8 @@ export interface Services {
   push: PushService;
   /** Enables POST /dev/login. Refused anyway unless the database is in test mode. */
   devLogin: boolean;
+  /** Emails dev login may make staff. Nobody else can ask for a role. */
+  devStaffEmails?: string[];
   /** Honors the X-Test-Now header. The database ignores it anyway in live mode. */
   testClock: boolean;
 }

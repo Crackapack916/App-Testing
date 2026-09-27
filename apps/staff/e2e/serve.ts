@@ -44,6 +44,7 @@ const child = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {
     DEV_LOGIN: "1",
     TEST_CLOCK: "1",
     PUSH: "log",
+    DEV_STAFF_EMAILS: "ops@e2e.test",
     STAFF_DIST: resolve("dist"),
     PORT: process.env.E2E_PORT ?? "8788",
   },

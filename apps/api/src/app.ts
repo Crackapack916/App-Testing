@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { bodyLimit } from "hono/body-limit";
 import type { Env, Services } from "./context";
 import { toResponse } from "./errors";
 import { customer } from "./routes/customer";
@@ -11,6 +12,7 @@ import { cards } from "./routes/cards";
 export function createApp(services: Services) {
   const app = new Hono<Env>();
   app.use("*", cors());
+  app.use("*", bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: "payload_too_large", message: "Request too large." }, 413) }));
 
   // One pooled connection per request. In test mode, X-Test-Now pins app_now() for it.
   app.use("*", async (c, next) => {
