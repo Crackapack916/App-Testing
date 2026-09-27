@@ -18,7 +18,8 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 * Mode is `test` until counsel clears the structure.
 
 ## Commands
-* `pnpm db:local` starts a local Postgres 16 and prints its URL
+* `pnpm db:local` starts a local Postgres 16 and prints its URL (the session start hook runs this automatically on the web)
+* `pnpm typecheck` typechecks every package
 * `pnpm --filter @crackapack/db test` runs the database suite (migrations + invariants)
 * `pnpm --filter @crackapack/payments test` runs the payments suite (needs the local Postgres)
 
