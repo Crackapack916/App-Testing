@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { freshDb, type Db } from "../../../packages/db/test/db";
 import { makeCard, makeProduct } from "../../../packages/db/test/fixtures";
 import { createApp } from "../src/app";
+import { linkClips } from "../src/clips";
 
 let db: Db;
 let app: ReturnType<typeof createApp>;
@@ -15,6 +16,7 @@ beforeEach(async () => {
     jwtSecret: "test-secret",
     push: { send: async (userId, title) => { pushed.push({ userId, title }); } },
     devLogin: true,
+    clips: linkClips,
     devStaffEmails: ["ops@x.test"],
     testClock: true,
   });
@@ -60,6 +62,17 @@ describe("auth", () => {
     const admin = await call("POST", "/dev/login", { body: { email: "mallory@x.test", role: "admin" } });
     expect(admin.status).toBe(403);
     expect(await db.q("select role from users where email = 'mallory@x.test'")).toEqual([]);
+  });
+
+  it("only lets an admin change roles", async () => {
+    const staff = await login("ops@x.test", "staff");
+    await login("newhire@x.test");
+    const denied = await call("POST", "/staff/team/role", { token: staff.token, body: { email: "newhire@x.test", role: "staff" } });
+    expect([denied.status, denied.body.error]).toEqual([403, "forbidden"]);
+    await db.q("update users set role = 'admin' where email = 'ops@x.test'");
+    const ok = await call("POST", "/staff/team/role", { token: staff.token, body: { email: "newhire@x.test", role: "staff" } });
+    expect(ok.status).toBe(200);
+    expect((await db.one("select role from users where email = 'newhire@x.test'")).role).toBe("staff");
   });
 
   it("rejects oversized requests", async () => {

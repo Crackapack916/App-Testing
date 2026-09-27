@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type pg from "pg";
 import { requireUser } from "../auth";
 import { ApiError } from "../errors";
-import type { Env } from "../context";
+import type { ClipService, Env } from "../context";
 
 /**
  * The nightly operations tool. Staff never choose a customer or a pack: the only way to
@@ -132,37 +132,37 @@ staff.post("/sessions/:id/complete", async (c) => {
 });
 
 /**
- * Records and publishes clips for fully opened orders that don't have one yet.
+ * Records and requests clips for fully opened orders that don't have one yet.
  * A clip runs from just before the order's first pack to the moment the next order's
  * first pack is opened (or the session ends), so every card reveal is inside it.
+ * Link clips are ready at once; Mux clips become ready via /webhooks/mux.
  */
-async function closeFinishedClips(c: { get: (k: "db" | "user") => any }, sessionId: string, exceptOrder: string | null) {
+async function closeFinishedClips(c: { get: (k: "db" | "user" | "services") => any }, sessionId: string, exceptOrder: string | null) {
   const db: pg.PoolClient = c.get("db");
   const actor = c.get("user").id;
+  const clips: ClipService = c.get("services").clips;
   const { rows } = await db.query(
-    `select o.id as order_id, min(po.stream_offset_ms) as first_ms, ${OFFSET_SQL} as end_ms, s.stream_ref
+    `select o.id as order_id, min(po.stream_offset_ms) as first_ms, ${OFFSET_SQL} as end_ms, s.stream_ref, s.started_at
      from opening_sessions s
      join orders o on o.batch_id = s.batch_id
      join queue_entries q on q.order_id = o.id
      left join pack_openings po on po.queue_entry_id = q.id
      where s.id = $1 and o.status = 'queued' and o.id is distinct from $2
        and not exists (select 1 from order_clips oc where oc.order_id = o.id)
-     group by o.id, s.stream_ref
+     group by o.id, s.stream_ref, s.started_at
      having bool_and(q.status = 'opened')`, [sessionId, exceptOrder]);
   for (const r of rows) {
     const start = Math.max(0, Number(r.first_ms) - CLIP_LEAD_MS);
     const end = Math.max(Number(r.end_ms), start + 1);
     await db.query("select record_order_clip($1, $2, $3, $4)", [r.order_id, start, end, actor]);
-    await db.query("select mark_clip_ready($1, $2, $3)", [r.order_id, clipRef(r.stream_ref, start, end), actor]);
+    try {
+      const out = await clips.create({ orderId: r.order_id, streamRef: r.stream_ref, sessionStartedAt: new Date(r.started_at), startMs: start, endMs: end });
+      if (out.status === "ready") await db.query("select mark_clip_ready($1, $2, $3)", [r.order_id, out.ref, actor]);
+    } catch (e) {
+      // The pack opening stands; the clip can be retried from the Notify screen.
+      await db.query("select mark_clip_failed($1, $2, $3)", [r.order_id, String((e as Error).message ?? e), actor]);
+    }
   }
-}
-
-/**
- * Pilot clip: a media fragment into the full session recording, so no video is re-encoded.
- * Replace with a Mux clip when the recording pipeline is in place.
- */
-function clipRef(streamRef: string | null, startMs: number, endMs: number) {
-  return `${streamRef ?? "recording"}#t=${(startMs / 1000).toFixed(1)},${(endMs / 1000).toFixed(1)}`;
 }
 
 // Logging contents -------------------------------------------------------------------
@@ -222,6 +222,21 @@ staff.get("/cards", async (c) => {
 
 // Notifying ---------------------------------------------------------------------------
 
+// Re-requests a failed clip with the offsets already recorded for it.
+staff.post("/orders/:id/clip/retry", async (c) => {
+  const db = c.get("db");
+  const id = c.req.param("id");
+  const { rows: [r] } = await db.query(
+    `select oc.start_offset_ms, oc.end_offset_ms, s.stream_ref, s.started_at from order_clips oc
+     join opening_sessions s on s.id = oc.session_id where oc.order_id = $1 and oc.status = 'failed'`, [id]);
+  if (!r) throw new ApiError("unknown_clip", 404);
+  await db.query("select retry_clip($1)", [id]);
+  const out = await (c.get("services").clips as ClipService).create({ orderId: id, streamRef: r.stream_ref,
+    sessionStartedAt: new Date(r.started_at), startMs: Number(r.start_offset_ms), endMs: Number(r.end_offset_ms) });
+  if (out.status === "ready") await db.query("select mark_clip_ready($1, $2, $3)", [id, out.ref, c.get("user").id]);
+  return c.json({ status: out.status });
+});
+
 staff.get("/batches/:id/orders", async (c) => {
   const { rows } = await c.get("db").query(
     `select o.id, o.quantity, o.status, coalesce(u.display_name, split_part(u.email, '@', 1)) as customer,
@@ -278,6 +293,14 @@ staff.post("/shipments/:id/shipped", async (c) => {
   const { tracking } = await c.req.json<{ tracking: string }>();
   if (!tracking?.trim()) throw new ApiError("tracking_required", 400);
   await c.get("db").query("select mark_shipped($1, $2)", [c.req.param("id"), tracking.trim()]);
+  return c.json({ ok: true });
+});
+
+// Team (admins only) ------------------------------------------------------------------
+
+staff.post("/team/role", requireUser("admin"), async (c) => {
+  const { email, role } = await c.req.json<{ email: string; role: string }>();
+  await c.get("db").query("select set_user_role($1, $2, $3)", [email, role, c.get("user").id]);
   return c.json({ ok: true });
 });
 

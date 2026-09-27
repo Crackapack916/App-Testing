@@ -14,9 +14,13 @@ export const token = {
   clear: () => localStorage.removeItem(TOKEN_KEY),
 };
 
+// With Clerk configured, a fresh Clerk session token per request; otherwise the pilot token.
+let clerkToken: (() => Promise<string | null>) | null = null;
+export const setClerkTokenProvider = (fn: () => Promise<string | null>) => { clerkToken = fn; };
+
 export async function api<T = any>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "content-type": "application/json" };
-  const t = token.get();
+  const t = clerkToken ? await clerkToken() : token.get();
   if (t) headers.authorization = `Bearer ${t}`;
   const now = localStorage.getItem(TEST_NOW_KEY);
   if (now) headers["x-test-now"] = now;

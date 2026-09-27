@@ -6,6 +6,11 @@ const CODES: Record<string, [number, string]> = {
   // auth
   unauthenticated: [401, "Sign in to continue."],
   forbidden: [403, "You don't have access to that."],
+  email_in_use: [409, "That email is already linked to another sign in."],
+  email_required: [400, "Your account needs an email address."],
+  invalid_role: [400, "Unknown role."],
+  unknown_user: [404, "No account with that email. They need to sign in once first."],
+  unknown_clip: [404, "No clip to retry for that order."],
   // ordering
   age_not_verified: [403, "Verify your age before ordering."],
   state_blocked: [403, "Orders aren't available in your state yet."],

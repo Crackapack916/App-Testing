@@ -2,9 +2,16 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { Button, ErrorText, Screen } from "../components/bits";
 import { useSession } from "../lib/session";
+import { ClerkSignIn } from "../components/ClerkSignIn";
 import { colors, radius } from "../lib/theme";
 
 export default function SignIn() {
+  const { mode } = useSession();
+  if (mode === "clerk") return <Screen><ClerkSignIn /></Screen>;
+  return <PilotSignIn />;
+}
+
+function PilotSignIn() {
   const { signIn } = useSession();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);

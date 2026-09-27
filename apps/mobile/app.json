@@ -7,7 +7,11 @@
     "icon": "./assets/images/icon.png",
     "scheme": "crackapack",
     "userInterfaceStyle": "dark",
-    "ios": { "bundleIdentifier": "com.crackapack.app", "supportsTablet": false },
+    "ios": {
+      "bundleIdentifier": "com.crackapack.app",
+      "supportsTablet": false,
+      "usesAppleSignIn": true
+    },
     "android": {
       "package": "com.crackapack.app",
       "adaptiveIcon": {
@@ -17,14 +21,33 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       }
     },
-    "web": { "output": "single", "favicon": "./assets/images/favicon.png" },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
     "plugins": [
       "expo-router",
+      "@clerk/expo",
+      "expo-apple-authentication",
       "expo-secure-store",
       "expo-video",
-      ["expo-notifications", { "color": "#F2B233" }],
-      ["expo-splash-screen", { "backgroundColor": "#0E0F13", "image": "./assets/images/icon.png", "imageWidth": 96 }]
+      [
+        "expo-notifications",
+        {
+          "color": "#F2B233"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0E0F13",
+          "image": "./assets/images/icon.png",
+          "imageWidth": 96
+        }
+      ]
     ],
-    "experiments": { "reactCompiler": true }
+    "experiments": {
+      "reactCompiler": true
+    }
   }
 }

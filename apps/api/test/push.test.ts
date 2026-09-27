@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { freshDb, type Db } from "../../../packages/db/test/db";
 import { expoPush } from "../src/push";
 import { createApp } from "../src/app";
+import { linkClips } from "../src/clips";
 
 let db: Db;
 beforeEach(async () => { db = await freshDb(); });
@@ -9,7 +10,7 @@ afterEach(async () => { await db.close(); });
 
 describe("expo push", () => {
   it("registers a device over the API, sends to it, and drops tokens Expo rejects", async () => {
-    const app = createApp({ pool: db.pool, jwtSecret: "s", push: { send: async () => {} }, devLogin: true, testClock: false });
+    const app = createApp({ pool: db.pool, jwtSecret: "s", push: { send: async () => {} }, devLogin: true, testClock: false, clips: linkClips });
     const login = await (await app.request("/dev/login", { method: "POST", body: JSON.stringify({ email: "a@x.test" }) })).json() as any;
     const auth = { authorization: `Bearer ${login.token}`, "content-type": "application/json" };
     for (const token of ["ExponentPushToken[good]", "ExponentPushToken[gone]"]) {

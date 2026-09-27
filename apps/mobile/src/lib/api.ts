@@ -6,12 +6,14 @@ export class ApiError extends Error {
   constructor(public code: string, message: string, public status: number) { super(message); }
 }
 
-let token: string | null = null;
-export const setApiToken = (t: string | null) => { token = t; };
+// A fresh token per request: Clerk session tokens live about a minute.
+let getToken: () => Promise<string | null> = async () => null;
+export const setTokenProvider = (fn: () => Promise<string | null>) => { getToken = fn; };
 
 /** JSON API call. Errors carry the server's customer readable message. */
 export async function api<T = any>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "content-type": "application/json" };
+  const token = await getToken();
   if (token) headers.authorization = `Bearer ${token}`;
   // End to end tests pin the server clock (honored only by a test mode database).
   if (Platform.OS === "web") {

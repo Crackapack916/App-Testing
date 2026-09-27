@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { api, token } from "./api";
+import { useEffect, useState } from "react";
+import { SignIn, useAuth } from "@clerk/react";
+import { api, token, setClerkTokenProvider } from "./api";
 import { useAction, useData, useHotkeys } from "./hooks";
 import { Tonight } from "./screens/Tonight";
 import { Session } from "./screens/Session";
@@ -29,7 +30,20 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
-export function App() {
+export function App({ clerk = false }: { clerk?: boolean }) {
+  return clerk ? <ClerkApp /> : <PilotApp />;
+}
+
+/** Staff sign in with Clerk; the API still decides who is staff (an admin promotes them). */
+function ClerkApp() {
+  const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
+  useEffect(() => { setClerkTokenProvider(() => getToken()); }, [getToken]);
+  if (!isLoaded) return null;
+  if (!isSignedIn) return <div className="login"><SignIn /></div>;
+  return <Shell onSignOut={() => signOut()} />;
+}
+
+function PilotApp() {
   const [authed, setAuthed] = useState(!!token.get());
   if (!authed) return <Login onDone={() => setAuthed(true)} />;
   return <Shell onSignOut={() => { token.clear(); setAuthed(false); }} />;

@@ -21,6 +21,10 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 
 * Card data: `packages/catalog` imports MTGJSON (AllPrintings, AllPricesToday) through `import_sets`, `import_cards` and `import_prices`. Cards match on (set, collector number) so internal ids never change. Price history is kept only for sets we sell and cards someone holds. Runs from `.github/workflows/mtgjson.yml` (needs the `NEON_DATABASE_URL` secret); this container cannot reach mtgjson.com.
 
+* Sign in: Clerk. The API verifies Clerk session tokens locally with `CLERK_JWT_KEY` and links accounts through `upsert_auth_user`; staff are promoted with `set_user_role` (admin only). Apps fall back to pilot sign in when no Clerk key is set.
+* Video: Mux when `MUX_*` is set (`apps/api/src/clips.ts`), else timestamp link clips. Mux clips arrive through `/webhooks/mux`; failures are retried from the Notify screen.
+* Hosting: Vercel (`apps/api/src/index.ts` for the API, `apps/staff` as a static site). Every account and key is listed in `docs/SETUP.md`.
+
 ## Apps
 * `apps/api`: Hono API. Customer routes at `/`, staff routes at `/staff` (staff role), processor webhooks at `/webhooks/:processor`. Database codes become HTTP responses only in `src/errors.ts`. `DEV_LOGIN=1` and `TEST_CLOCK=1` (X-Test-Now header) are pilot only: refused by a live database, and the server won't start with them when `NODE_ENV=production`. Dev login grants staff only to emails in `DEV_STAFF_EMAILS`. Requests are capped at 256 KB.
 * `apps/staff`: the nightly ops tool (Vite + React), served by the API at `/ops`. Keys: T/S/L/N/K/P switch screens (K = Stock: put a set on sale, price ladder, receive boxes; P = Ship: pick lists and tracking); Space cracks the next pack; B opens the next sealed box; V voids; collector number + Enter logs a card (`f`/`e` suffix for foil/etched); Ctrl+Enter finalizes a pack.

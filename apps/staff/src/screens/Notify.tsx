@@ -14,6 +14,7 @@ export function Notify({ batch }: { batch: TonightData["batch"] }) {
   const sent = list.filter((o) => o.status === "fulfilled").length;
 
   const notify = () => run(async () => { await api("POST", `/staff/batches/${batch.id}/notify`); await orders.reload(); });
+  const retry = (orderId: string) => run(async () => { await api("POST", `/staff/orders/${orderId}/clip/retry`); await orders.reload(); });
 
   return (
     <div className="stack">
@@ -40,7 +41,10 @@ export function Notify({ batch }: { batch: TonightData["batch"] }) {
                 <td>{o.customer}</td>
                 <td className="num">{o.quantity}</td>
                 <td className="num">{o.packs_logged} / {o.quantity}</td>
-                <td>{o.clip_status ?? "waiting"}</td>
+                <td>
+                  {o.clip_status ?? "waiting"}
+                  {o.clip_status === "failed" && <button className="link" data-testid="retry-clip" disabled={busy} onClick={() => retry(o.id)}>retry</button>}
+                </td>
                 <td>{o.status === "fulfilled" ? "notified" : isReady(o) ? "ready" : "pending"}</td>
               </tr>
             ))}
