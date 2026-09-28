@@ -108,6 +108,8 @@ const CODES: Record<string, [number, string]> = {
   video_size_mismatch: [409, "The stored file doesn't match what was uploaded. Upload it again."],
   videos_not_ready: [409, "Every pack needs a ready video first."],
   session_master_exists: [409, "This night's session recording is already uploaded."],
+  policies_not_accepted: [403, "Confirm you are 18 or older and agree to the Terms and Privacy Policy first."],
+  unknown_policy: [404, "Page not found."],
   // payments
   unknown_bundle: [400, "Unknown credit bundle."],
 };

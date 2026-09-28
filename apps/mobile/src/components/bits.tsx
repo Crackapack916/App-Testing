@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ActivityIndicator, ImageBackground, Linking, Platform, Pressable, StyleSheet, View, type ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CircleAlert } from "lucide-react-native";
 import { Text } from "./Text";
@@ -149,7 +150,7 @@ export function Footer({ onStage }: { onStage?: boolean }) {
           onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}>{SUPPORT_EMAIL}</Text>
         {"  "}
         <Text style={[s.footText, s.footLink, { color: onStage ? stage.accent : colors.link }]} accessibilityRole="link"
-          onPress={() => Linking.openURL("/policies")}>Fairness and policies</Text>
+          onPress={() => router.push("/policies")}>Fairness and policies</Text>
       </Text>
     </View>
   );

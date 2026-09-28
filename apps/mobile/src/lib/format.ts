@@ -24,3 +24,6 @@ export function legalityTags(legalities: Record<string, string> | null | undefin
 /** A time shown in Pacific, which is how every cutoff and window is defined. */
 export const pacific = (t: string | Date) =>
   new Date(t).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+/** "October 1, 2026": the Last updated date on policy pages. */
+export const updated = (t: string) => new Date(t).toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", month: "long", day: "numeric", year: "numeric" });

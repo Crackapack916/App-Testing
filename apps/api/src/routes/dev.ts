@@ -24,5 +24,8 @@ dev.post("/login", async (c) => {
      values ($1, $2, coalesce($3, 'customer'), case when $4 then now() end, case when $4 then 'CA' end)
      on conflict (email) do update set display_name = coalesce(excluded.display_name, users.display_name)
      returning id, role`, [email, display_name ?? null, role ?? null, verified === true]);
+  // A verified pilot account stands for one that has signed up and passed its first purchase
+  // checks, so it has accepted the current Terms and Privacy Policy.
+  if (verified === true) await db.query("select accept_policies_at_purchase($1) where needs_policy_acceptance($1)", [u.id]);
   return c.json({ token: await issueToken(u.id, c.get("services").jwtSecret), user_id: u.id, role: u.role });
 });

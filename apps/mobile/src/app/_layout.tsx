@@ -51,6 +51,9 @@ function Root() {
         <Stack.Screen name="sign-in" />
       </Stack.Protected>
       <Stack.Screen name="reset-password" />
+      {/* Policies are public, even before sign in or age confirmation. */}
+      <Stack.Screen name="policies/index" />
+      <Stack.Screen name="policies/[doc]" />
     </Stack>
   );
 }

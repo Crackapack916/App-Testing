@@ -66,11 +66,13 @@ customer.get("/me", async (c) => {
             (select age_verified_at is not null from users where id = $1) as age_verified,
             (select email from users where id = $1) as email,
             (select buyback_enabled from system_config) as buyback,
-            (select count(*) from notifications n where n.user_id = $1 and n.kind = 'cracked' and n.opened_at is null)::int as unseen
+            (select count(*) from notifications n where n.user_id = $1 and n.kind = 'cracked' and n.opened_at is null)::int as unseen,
+            needs_policy_acceptance($1) as needs_policies
      from (select 1) x left join credit_accounts a on a.user_id = $1`, [u.id]);
   return c.json({ id: u.id, display_name: u.display_name, role: u.role, age_verified: acct.age_verified, email: acct.email,
     credits: { total: acct.purchased + acct.earned, refundable: acct.purchased, earned: acct.earned },
-    features: { buyback: acct.buyback }, unseen_cracked: acct.unseen });
+    features: { buyback: acct.buyback }, unseen_cracked: acct.unseen,
+    needs_policy_acceptance: acct.needs_policies });
 });
 
 // Spending: daily, weekly and monthly limits (each optional) and breaks.
@@ -138,6 +140,8 @@ customer.post("/me/break/end-request", async (c) => {
 
 customer.post("/orders", async (c) => {
   const body = await c.req.json<{ product_id: string; quantity: number }>();
+  // The 18+ confirmation and current Terms are accepted before the first purchase.
+  await c.get("db").query("select assert_policies_accepted($1)", [c.get("user").id]);
   const { rows: [r] } = await c.get("db").query("select place_order($1, $2, $3) as id",
     [c.get("user").id, body.product_id, body.quantity]);
   const { rows: [o] } = await c.get("db").query(
@@ -148,6 +152,12 @@ customer.post("/orders", async (c) => {
   await sendSafely(c.get("services"), { kind: "order_confirmation", to: o.email, data: { packs: o.quantity, set_name: o.set_name, credits: o.total_credits } });
   if (o.left === 0) await staffAlert(c.get("services"), `${o.product} sold out`, `The last sellable pack of ${o.product} was just ordered. Receive more boxes on the Stock screen, or leave it sold out.`);
   return c.json({ order_id: r.id }, 201);
+});
+
+// First purchase (and after a Terms update): "I'm 18 or older and agree to the Terms and Privacy Policy."
+customer.post("/me/policies/accept", async (c) => {
+  await c.get("db").query("select accept_policies_at_purchase($1)", [c.get("user").id]);
+  return c.json({ ok: true });
 });
 
 customer.post("/orders/:id/cancel", async (c) => {

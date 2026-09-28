@@ -11,6 +11,7 @@ import { dev } from "./routes/dev";
 import { cards } from "./routes/cards";
 import { auth } from "./routes/auth";
 import { drops } from "./routes/drops";
+import { policies } from "./routes/policies";
 import { localVideoFiles } from "./routes/local-videos";
 
 export function createApp(options: ServiceOptions) {
@@ -46,6 +47,7 @@ export function createApp(options: ServiceOptions) {
   app.route("/auth", auth);
   app.route("/", cards);
   app.route("/", drops);
+  app.route("/", policies);
   app.route("/", localVideoFiles);
   app.route("/", customer);
   app.route("/staff", staff);

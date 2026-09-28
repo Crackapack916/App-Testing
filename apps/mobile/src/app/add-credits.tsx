@@ -59,7 +59,8 @@ export default function AddCredits() {
               })}
             </View>
             {me && <Button testID="checkout" label={choice ? "Continue to secure checkout" : "Choose an amount"} onPress={pay} busy={busy} disabled={!choice} />}
-            <Text style={type.small}>Payment is handled by Stripe on a secure page.</Text>
+            <Text style={type.small}>Payment is handled by Stripe on a secure page. The price shown is the price you pay.</Text>
+            <Text style={[type.small, { color: colors.link, textDecorationLine: "underline" }]} accessibilityRole="link" onPress={() => router.push("/policies")}>Fairness and policies</Text>
             <ErrorText>{error}</ErrorText>
           </View>
         </View>

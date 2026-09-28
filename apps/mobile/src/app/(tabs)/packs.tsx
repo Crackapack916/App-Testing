@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ExternalLink, Minus, Plus } from "lucide-react-native";
+import { Check, ExternalLink, Minus, Plus } from "lucide-react-native";
 import { Text } from "../../components/Text";
 import { Button, ErrorText, Footer, Stage } from "../../components/bits";
 import { Carousel } from "../../components/Carousel";
@@ -134,6 +134,9 @@ export default function Packs() {
                 <Text style={s.linkText}>What's in a pack</Text><ExternalLink size={14} color={stage.accent} />
               </Pressable>
             ) : null}
+            <Pressable accessibilityRole="link" onPress={() => router.push("/policies")} style={s.link} testID="how-it-works">
+              <Text style={s.linkText}>How it works and our fairness promise</Text>
+            </Pressable>
             <Text style={s.fine}>
               Your pack stays sealed until tonight's session. We open every pack on camera in queue order between 7 and 8 PM PT.
               You can cancel for a full credit refund until 7 PM PT.
@@ -182,9 +185,14 @@ function ConfirmSheet({ product, qty, total, suggestLimit, onClose, onPlaced, bo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [placed, setPlaced] = useState(false);
+  const { me } = useSession();
+  const mustAccept = !!me?.needs_policy_acceptance;
+  const [agreed, setAgreed] = useState(false);
   const place = async () => {
     setBusy(true); setError(null);
     try {
+      // First purchase: the 18+ confirmation and the Terms are logged before the order.
+      if (mustAccept) await api("POST", "/me/policies/accept");
       await api("POST", "/orders", { product_id: product.product_id, quantity: qty });
       setPlaced(true);
       onPlaced();
@@ -220,7 +228,17 @@ function ConfirmSheet({ product, qty, total, suggestLimit, onClose, onPlaced, bo
               <Text style={s.total} testID="total">{credits(total)} credits</Text>
             </View>
             <Text style={type.small}>Credits are used on CrackAPack packs only. Cancel before 7:00 PM PT for a full credit refund.</Text>
-            <Button testID="place-order" label="Confirm order" onPress={place} busy={busy} />
+            {mustAccept && (
+              <Pressable testID="accept-policies" accessibilityRole="checkbox" accessibilityState={{ checked: agreed }} onPress={() => setAgreed(!agreed)} style={s.agree}>
+                <View style={[s.box, agreed && s.boxOn]}>{agreed ? <Check size={16} color={palette.ink[100]} /> : null}</View>
+                <Text style={[type.body, { flex: 1 }]}>
+                  I'm 18 or older and I agree to the{" "}
+                  <Text style={s.inlineLink} accessibilityRole="link" onPress={() => { onClose(); router.push("/policies/terms"); }}>Terms</Text> and{" "}
+                  <Text style={s.inlineLink} accessibilityRole="link" onPress={() => { onClose(); router.push("/policies/privacy"); }}>Privacy Policy</Text>.
+                </Text>
+              </Pressable>
+            )}
+            <Button testID="place-order" label="Confirm order" onPress={place} busy={busy} disabled={mustAccept && !agreed} />
             <ErrorText>{error}</ErrorText>
           </View>
         )}
@@ -263,6 +281,10 @@ const s = StyleSheet.create({
   scrim: { flex: 1, backgroundColor: "rgba(10, 16, 26, 0.6)" },
   sheet: { backgroundColor: palette.ink[100], borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxWidth: 560, width: "100%", alignSelf: "center" },
   row: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
+  agree: { flexDirection: "row", gap: 10, alignItems: "flex-start", minHeight: 44 },
+  box: { width: 24, height: 24, borderRadius: 4, borderWidth: 2, borderColor: palette.blue[500], alignItems: "center", justifyContent: "center", marginTop: 1 },
+  boxOn: { backgroundColor: palette.blue[500] },
+  inlineLink: { color: palette.blue[500], textDecorationLine: "underline", fontFamily: font.bodySemi },
   totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" },
   total: { fontFamily: font.monoMedium, fontSize: 20, color: palette.ink[700] },
 });

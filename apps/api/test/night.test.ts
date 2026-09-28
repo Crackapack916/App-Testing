@@ -117,12 +117,16 @@ describe("age gate and limits", () => {
     await db.q("select purchase_credits($1, 10000, 'seed')", [r.body.user_id]);
     expect((await call("GET", "/me", { token })).body.age_verified).toBe(false);
     let o = await call("POST", "/orders", { token, at: BEFORE, body: { product_id: p, quantity: 1 } });
-    expect([o.status, o.body.error]).toEqual([403, "age_not_verified"]);
+    expect([o.status, o.body.error]).toEqual([403, "policies_not_accepted"]);
+    expect((await call("POST", "/me/policies/accept", { token, at: BEFORE })).body.error).toBe("age_not_verified");
     // An account without a birthdate on file confirms it once.
     const young = await call("POST", "/auth/confirm-age", { token, at: BEFORE, body: { dob: { month: "5", day: "5", year: "2012" } } });
     expect([young.status, young.body.error]).toEqual([403, "underage"]);
     expect((await call("POST", "/auth/confirm-age", { token, at: BEFORE, body: { dob: { month: "5", day: "5", year: "1995" } } })).status).toBe(200);
     expect((await call("POST", "/auth/confirm-age", { token, at: BEFORE, body: { dob: { month: "5", day: "5", year: "1990" } } })).body.error).toBe("birthdate_locked");
+    expect((await call("GET", "/me", { token })).body.needs_policy_acceptance).toBe(true);
+    expect((await call("POST", "/me/policies/accept", { token, at: BEFORE })).status).toBe(200);
+    expect((await call("GET", "/me", { token })).body.needs_policy_acceptance).toBe(false);
     expect((await call("GET", "/me/limits", { token, at: BEFORE })).body.suggest_limit).toBe(true);
     expect((await call("PUT", "/me/limits/daily", { token, at: BEFORE, body: { credits: 1000 } })).body).toEqual({ result: "applied" });
     expect((await call("POST", "/orders", { token, at: BEFORE, body: { product_id: p, quantity: 1 } })).status).toBe(201);
@@ -334,5 +338,20 @@ describe("a full night over the API", () => {
     // The whole night is on the custody chain.
     expect((await db.one("select verify_custody_chain() as b")).b).toBeNull();
 
+  });
+});
+
+describe("policies", () => {
+  it("serves each page with its version and date, and shows sell back only when it is on", async () => {
+    const list = (await call("GET", "/policies")).body.policies;
+    expect(list.map((p: any) => [p.doc, p.version])).toEqual([["fairness", "2026-10-01"], ["terms", "2026-10-01"], ["privacy", "2026-10-01"]]);
+    let f = (await call("GET", "/policies/fairness")).body;
+    expect(f.body_md).toContain("## Our fairness promise");
+    expect(f.body_md).not.toContain("Selling cards back");
+    await db.q("update system_config set buyback_enabled = true");
+    f = (await call("GET", "/policies/fairness")).body;
+    expect(f.body_md).toContain("## Selling cards back\n");
+    expect(f.body_md).not.toContain("{buyback}");
+    expect((await call("GET", "/policies/nope")).status).toBe(404);
   });
 });

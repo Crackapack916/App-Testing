@@ -23,6 +23,7 @@ test("set, lower, remove limits, then a break that blocks ordering and can only 
   await page.getByTestId("tab-packs").click();
   await page.getByTestId("qty-1").click();
   await page.getByTestId("buy").click();
+  await page.getByTestId("accept-policies").click();
   await page.getByTestId("place-order").click();
   await expect(page.getByTestId("placed")).toBeVisible();
   await page.getByRole("button", { name: "Done" }).click();

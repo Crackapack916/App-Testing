@@ -67,7 +67,8 @@ describe("pack videos on local storage", () => {
     expect(part.status).toBe(206);
     expect(part.headers.get("content-range")).toBe("bytes 1000-1999/300000");
     expect(new Uint8Array(await part.arrayBuffer())).toEqual(bytes.slice(1000, 2000));
-    expect((await app.request(u.pathname + u.search.replace(/sig=../, "sig=00"))).status).toBe(403);
+    const forged = u.searchParams.get("sig")!.replace(/^./, (ch) => (ch === "0" ? "1" : "0"));
+    expect((await app.request(`${u.pathname}?exp=${u.searchParams.get("exp")}&sig=${forged}`)).status).toBe(403);
     expect((await app.request(u.pathname + "?exp=1&sig=" + u.searchParams.get("sig"))).status).toBe(403);
     // The customer can't watch until the batch is approved.
     expect((await json("GET", `/me/packs/${id}/video`, { token: cust.token })).status).toBe(404);

@@ -68,6 +68,9 @@ test("a customer's night: order, get cracked, watch, vault, ship, search", async
   await expect(page.getByTestId("limit-prompt")).toBeVisible();
   await page.getByTestId("limit-not-now").click();
   await expect(page.getByTestId("total")).toHaveText("2,550 credits");
+  // First purchase: the 18+ confirmation and the Terms, logged before the order.
+  await expect(page.getByTestId("place-order")).toBeDisabled();
+  await page.getByTestId("accept-policies").click();
   await shot(page, "m2-order");
   await page.getByTestId("place-order").click();
   await expect(page.getByTestId("placed")).toContainText("still sealed");
