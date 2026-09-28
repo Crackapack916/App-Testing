@@ -8,7 +8,7 @@ import { createApp } from "../src/app";
 import { linkClips } from "../src/clips";
 
 // Item 15: every template, HTML and plain text, and the rules they follow.
-const ctx = { appUrl: "https://crackapack.test", mailingAddress: "PO Box 1, Sacramento, CA 95814" };
+const ctx: { appUrl: string; mailingAddress: string | null } = { appUrl: "https://crackapack.test", mailingAddress: "PO Box 1, Sacramento, CA 95814" };
 const SAMPLES: Record<EmailKind, Record<string, unknown>> = {
   order_confirmation: { packs: 3, set_name: "Foundations", credits: 2850 },
   pack_cracked: { packs: 3, set_name: "Foundations", url: "https://crackapack.test/vault" },
