@@ -40,29 +40,65 @@ customer.get("/me", async (c) => {
     features: { buyback: acct.buyback } });
 });
 
-// Age gate: birthdate and state (self attested in the pilot).
+// Spending: daily, weekly and monthly limits (each optional) and breaks.
+export const BUSINESS_EMAIL = "crackapack.business@gmail.com";
+
 customer.get("/me/limits", async (c) => {
+  const db = c.get("db");
   const id = c.get("user").id;
-  const { rows: [r] } = await c.get("db").query(
-    `select e.daily::int, e.monthly::int, e.break_until,
-            spent_on_packs($1, '24 hours')::int as spent_today, spent_on_packs($1, '30 days')::int as spent_month,
-            l.pending_daily::int, l.pending_monthly::int, l.pending_at,
-            (select max_daily_spend_credits::int from system_config) as max_daily,
-            (select max_monthly_spend_credits::int from system_config) as max_monthly
-     from effective_spend_limits($1) e left join spend_limits l on l.user_id = $1`, [id]);
-  return c.json(r);
+  const { rows } = await db.query(
+    `select period, limit_credits::int as limit, spent::int, resets_at, pending_credits::int as pending, has_pending,
+            (select pending_daily_at from spend_limits where user_id = $1) as pd_at,
+            (select pending_weekly_at from spend_limits where user_id = $1) as pw_at,
+            (select pending_monthly_at from spend_limits where user_id = $1) as pm_at
+     from spending_summary($1)`, [id]);
+  const { rows: [b] } = await db.query(
+    `select break_until, break_until > app_now() as on_break,
+            exists (select 1 from break_end_requests r where r.user_id = $1 and r.resolved_at is null) as end_requested,
+            (select count(*) from orders where user_id = $1)::int as orders,
+            (select limit_loosen_delay_hours from system_config) as loosen_delay_hours
+     from (select 1) x left join spend_limits l on l.user_id = $1`, [id]);
+  const at = { daily: "pd_at", weekly: "pw_at", monthly: "pm_at" } as const;
+  return c.json({
+    limits: rows.map((r) => ({ period: r.period, limit: r.limit, spent: r.spent, resets_at: r.resets_at,
+      pending: r.has_pending ? { limit: r.pending, at: r[at[r.period as keyof typeof at]] } : null })),
+    break_until: b.on_break ? b.break_until : null,
+    break_end_requested: b.end_requested,
+    // Prompt gently to set a limit before a first purchase.
+    suggest_limit: b.orders === 0 && rows.every((r) => r.limit == null),
+    loosen_delay_hours: b.loosen_delay_hours,
+    support_email: BUSINESS_EMAIL,
+  });
 });
 
-customer.put("/me/limits", async (c) => {
-  const { daily, monthly } = await c.req.json<{ daily: number | null; monthly: number | null }>();
-  await c.get("db").query("select set_spend_limits($1, $2, $3)", [c.get("user").id, daily, monthly]);
-  return c.json({ ok: true });
+customer.put("/me/limits/:period", async (c) => {
+  const { credits } = await c.req.json<{ credits: number | null }>();
+  const db = c.get("db");
+  const { rows: [r] } = await db.query("select set_spend_limit($1, $2, $3) as result", [c.get("user").id, c.req.param("period"), credits]);
+  const { rows: [u] } = await db.query("select email from users where id = $1", [c.get("user").id]);
+  await c.get("services").email.send({ kind: "limit_changed", to: u.email,
+    data: { period: c.req.param("period"), credits, pending: r.result === "pending" } });
+  return c.json({ result: r.result });
 });
 
 customer.post("/me/break", async (c) => {
-  const { days } = await c.req.json<{ days: number }>();
-  const { rows: [r] } = await c.get("db").query("select take_break($1, $2) as until", [c.get("user").id, days]);
+  const { hours } = await c.req.json<{ hours: number }>();
+  const db = c.get("db");
+  const { rows: [r] } = await db.query("select take_break($1, $2) as until", [c.get("user").id, hours]);
+  const { rows: [u] } = await db.query("select email from users where id = $1", [c.get("user").id]);
+  await c.get("services").email.send({ kind: "break_started", to: u.email, data: { until: r.until } });
   return c.json({ break_until: r.until });
+});
+
+// "Request early end": recorded for staff; the app also opens a pre filled email.
+customer.post("/me/break/end-request", async (c) => {
+  const db = c.get("db");
+  await db.query("select request_break_end($1)", [c.get("user").id]);
+  const { rows: [u] } = await db.query(
+    "select u.email, l.break_until from users u join spend_limits l on l.user_id = u.id where u.id = $1", [c.get("user").id]);
+  const subject = "Break end request";
+  const body = `Account email: ${u.email}\nBreak ends: ${new Date(u.break_until).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })} Pacific\n`;
+  return c.json({ mailto: `mailto:${BUSINESS_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}` });
 });
 
 customer.post("/orders", async (c) => {
@@ -180,6 +216,8 @@ customer.post("/me/shipments", async (c) => {
 customer.post("/checkout", async (c) => {
   const payments = c.get("services").payments;
   if (!payments) throw new ApiError("payments_unavailable", 503);
+  // No adding credit during a break.
+  await c.get("db").query("select assert_not_on_break($1)", [c.get("user").id]);
   const { bundle_key, success_url, cancel_url } = await c.req.json<{ bundle_key: string; success_url: string; cancel_url: string }>();
   const out = await payments.createCheckout({ userId: c.get("user").id, bundleKey: bundle_key, successUrl: success_url, cancelUrl: cancel_url });
   return c.json(out, 201);

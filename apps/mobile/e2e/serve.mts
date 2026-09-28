@@ -32,6 +32,10 @@ for (const c of cards) {
 const [alice] = await db.q("insert into users (email, display_name, age_verified_at, password_hash) values ('alice@e2e.test', 'alice', now(), $1) returning id",
   [await hashPassword("alice password")]);
 await db.q("select record_credit_purchase($1, 5000, 'stripe', 'cs_e2e_seed')", [alice.id]);
+// A funded customer for the spending limits spec.
+const [lim] = await db.q("insert into users (email, display_name, age_verified_at, password_hash) values ('limits@e2e.test', 'limits', now(), $1) returning id",
+  [await hashPassword("limits password")]);
+await db.q("select record_credit_purchase($1, 5000, 'stripe', 'cs_e2e_seed_limits')", [lim.id]);
 await db.pool.end();
 
 const api = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {

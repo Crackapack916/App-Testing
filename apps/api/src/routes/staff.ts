@@ -300,6 +300,24 @@ staff.post("/shipments/:id/shipped", async (c) => {
 
 // Team (admins only) ------------------------------------------------------------------
 
+// Break end requests and lifting a break (a reason is required and logged).
+staff.get("/break-requests", async (c) => {
+  const { rows } = await c.get("db").query(
+    `select r.id, r.user_id, u.email, r.break_until, r.requested_at from break_end_requests r join users u on u.id = r.user_id
+     where r.resolved_at is null order by r.requested_at`);
+  return c.json({ requests: rows });
+});
+
+staff.post("/users/:id/lift-break", async (c) => {
+  const { reason } = await c.req.json<{ reason: string }>();
+  const db = c.get("db");
+  await db.query("select lift_break($1, $2, $3)", [c.req.param("id"), reason, c.get("user").id]);
+  const { rows: [u] } = await db.query("select email from users where id = $1", [c.req.param("id")]);
+  await db.query("select mark_break_end_emailed($1)", [c.req.param("id")]);
+  await c.get("services").email.send({ kind: "break_ended", to: u.email, data: { lifted: true } });
+  return c.json({ ok: true });
+});
+
 staff.post("/team/role", requireUser("admin"), async (c) => {
   const { email, role } = await c.req.json<{ email: string; role: string }>();
   await c.get("db").query("select set_user_role($1, $2, $3)", [email, role, c.get("user").id]);

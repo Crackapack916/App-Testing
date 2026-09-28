@@ -15,3 +15,7 @@ const FORMATS = ["standard", "pioneer", "modern", "legacy", "vintage", "commande
 export function legalityTags(legalities: Record<string, string> | null | undefined) {
   return FORMATS.map((f) => ({ format: f, status: (legalities?.[f] ?? "Not legal") as string }));
 }
+
+/** A time shown in Pacific, which is how every cutoff and window is defined. */
+export const pacific = (t: string | Date) =>
+  new Date(t).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });

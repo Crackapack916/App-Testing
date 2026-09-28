@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, testClock } from "../api";
 import { shortId, useAction } from "../hooks";
 import type { TonightData } from "../App";
+import { BreakRequests } from "./BreakRequests";
 
 /** Pre session: the queue for tonight, sealed stock, and the lock. */
 export function Tonight({ data, reload, goSession }: { data: TonightData | null; reload: () => void; goSession: () => void }) {
@@ -26,6 +27,7 @@ export function Tonight({ data, reload, goSession }: { data: TonightData | null;
 
   return (
     <div className="stack">
+      <BreakRequests />
       {!batch && (
         <section className="panel">
           <h2>Nothing to open yet</h2>

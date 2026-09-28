@@ -1,86 +1,160 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Button, ErrorText, Panel } from "./bits";
 import { api } from "../lib/api";
 import { useApi } from "../lib/useApi";
-import { dollars } from "../lib/format";
-import { colors } from "../lib/theme";
+import { credits, pacific } from "../lib/format";
+import { colors, radius } from "../lib/theme";
 
-type Limits = { daily: number; monthly: number; break_until: string | null; spent_today: number; spent_month: number;
-  pending_daily: number | null; pending_monthly: number | null; pending_at: string | null; max_daily: number; max_monthly: number };
+type Period = "daily" | "weekly" | "monthly";
+type Limit = { period: Period; limit: number | null; spent: number; resets_at: string; pending: { limit: number | null; at: string } | null };
+type Limits = { limits: Limit[]; break_until: string | null; break_end_requested: boolean; loosen_delay_hours: number; support_email: string };
 
-const DAILY_CHOICES = [2500, 5000, 10000, 25000];
+const WINDOW: Record<Period, { name: string; word: string; resets: string }> = {
+  daily: { name: "Daily", word: "today", resets: "Resets at 12:00 AM Pacific." },
+  weekly: { name: "Weekly", word: "this week", resets: "Resets Monday 12:00 AM Pacific." },
+  monthly: { name: "Monthly", word: "this month", resets: "Resets on the 1st at 12:00 AM Pacific." },
+};
+const BREAKS = [{ hours: 24, label: "24 hours" }, { hours: 168, label: "7 days" }, { hours: 720, label: "30 days" }];
 
-/** Spending limits and breaks. Lowering is instant; raising takes 24 hours. */
+/** Account, Spending: optional daily, weekly and monthly limits, and breaks. */
 export function LimitsPanel() {
-  const limits = useApi<Limits>("/me/limits");
+  const data = useApi<Limits>("/me/limits");
   const [error, setError] = useState<string | null>(null);
   const [confirmBreak, setConfirmBreak] = useState<number | null>(null);
-  const l = limits.data;
+  const l = data.data;
   if (!l) return null;
-  const onBreak = l.break_until && new Date(l.break_until).getTime() > Date.now();
 
-  const setDaily = async (daily: number) => {
+  const takeBreak = async (hours: number) => {
     setError(null);
-    try { await api("PUT", "/me/limits", { daily: daily >= l.max_daily ? null : daily, monthly: null }); await limits.reload(); }
+    try { await api("POST", "/me/break", { hours }); setConfirmBreak(null); await data.reload(); }
     catch (e) { setError((e as Error).message); }
   };
-  const takeBreak = async (days: number) => {
-    try { await api("POST", "/me/break", { days }); setConfirmBreak(null); await limits.reload(); }
-    catch (e) { setError((e as Error).message); }
+  const requestEnd = async () => {
+    setError(null);
+    try {
+      const r = await api<{ mailto: string }>("POST", "/me/break/end-request");
+      await data.reload();
+      Linking.openURL(r.mailto).catch(() => {});
+    } catch (e) { setError((e as Error).message); }
   };
 
   return (
-    <Panel style={{ gap: 10 }}>
-      <Text style={s.label}>Spending limits</Text>
-      <Bar label="Last 24 hours" used={l.spent_today} limit={l.daily} />
-      <Bar label="Last 30 days" used={l.spent_month} limit={l.monthly} />
-      <Text style={s.muted}>24 hour limit</Text>
-      <View style={s.row}>
-        {DAILY_CHOICES.map((d) => (
-          <Pressable key={d} testID={`limit-${d}`} onPress={() => setDaily(d)} style={[s.chip, l.daily === d && s.chipOn]}>
-            <Text style={[s.chipText, l.daily === d && { color: colors.accentInk }]}>{dollars(d)}</Text>
-          </Pressable>
-        ))}
-      </View>
-      {l.pending_at && <Text style={s.muted}>Raise to {dollars(l.pending_daily ?? l.max_daily)} takes effect {new Date(l.pending_at).toLocaleString()}.</Text>}
-      {onBreak
-        ? <Text style={s.body} testID="on-break">On a break until {new Date(l.break_until!).toLocaleDateString()}.</Text>
-        : confirmBreak
-          ? <View style={{ gap: 8 }}>
-              <Text style={s.body}>Pause ordering for {confirmBreak} days? You can't end a break early.</Text>
-              <View style={s.row}><Button kind="ghost" label="Cancel" onPress={() => setConfirmBreak(null)} /><Button kind="danger" label="Start break" onPress={() => takeBreak(confirmBreak)} /></View>
-            </View>
-          : <View style={s.row}>
-              <Text style={[s.muted, { alignSelf: "center" }]}>Take a break:</Text>
-              {[1, 7, 30].map((d) => <Pressable key={d} onPress={() => setConfirmBreak(d)} style={s.chip}><Text style={s.chipText}>{d}d</Text></Pressable>)}
-            </View>}
+    <Panel style={{ gap: 14 }}>
+      <Text style={s.label} accessibilityRole="header">Spending</Text>
+      {l.limits.map((lim) => <LimitRow key={lim.period} lim={lim} onBreak={!!l.break_until} reload={data.reload} />)}
+      <Text style={s.muted}>
+        {l.loosen_delay_hours > 0
+          ? `Lowering a limit works right away. Raising or removing one takes ${l.loosen_delay_hours} hours.`
+          : "Changes take effect right away."}
+      </Text>
+
+      <View style={s.divider} />
+      <Text style={s.label} accessibilityRole="header">Take a break</Text>
+      {l.break_until ? (
+        <View style={{ gap: 8 }} testID="on-break">
+          <Text style={s.body}>You're on a break until {pacific(l.break_until)} Pacific.</Text>
+          <Text style={s.muted}>You can't buy packs or add credit until then. You can still see your Vault, watch videos and ship cards.</Text>
+          {l.break_end_requested
+            ? <Text style={s.muted} testID="end-requested">Early end requested. We'll reply from {l.support_email}.</Text>
+            : <Button testID="request-end" kind="ghost" label="Request early end" onPress={requestEnd} />}
+        </View>
+      ) : confirmBreak ? (
+        <View style={{ gap: 8 }}>
+          <Text style={s.body}>Take a {BREAKS.find((b) => b.hours === confirmBreak)!.label} break? You can't buy packs or add credit, and you can't end it early yourself.</Text>
+          <View style={s.row}>
+            <Button kind="ghost" label="Cancel" onPress={() => setConfirmBreak(null)} />
+            <Button testID="start-break" kind="danger" label="Start break" onPress={() => takeBreak(confirmBreak)} />
+          </View>
+        </View>
+      ) : (
+        <View style={s.row}>
+          {BREAKS.map((b) => (
+            <Pressable key={b.hours} testID={`break-${b.hours}`} onPress={() => setConfirmBreak(b.hours)} style={s.chip} accessibilityRole="button">
+              <Text style={s.chipText}>{b.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
       <ErrorText>{error}</ErrorText>
     </Panel>
   );
 }
 
-function Bar({ label, used, limit }: { label: string; used: number; limit: number }) {
-  const pct = Math.min(100, (100 * used) / Math.max(1, limit));
+function LimitRow({ lim, onBreak, reload }: { lim: Limit; onBreak: boolean; reload: () => Promise<void> }) {
+  const w = WINDOW[lim.period];
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(lim.limit ? String(lim.limit) : "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async (next: number | null) => {
+    setBusy(true); setError(null);
+    try { await api("PUT", `/me/limits/${lim.period}`, { credits: next }); setEditing(false); await reload(); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  };
+  const pct = lim.limit ? Math.min(100, (100 * lim.spent) / lim.limit) : 0;
+
   return (
-    <View style={{ gap: 4 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Text style={s.muted}>{label}</Text>
-        <Text style={s.muted}>{dollars(used)} of {dollars(limit)}</Text>
+    <View style={{ gap: 6 }} testID={`limit-${lim.period}`}>
+      <View style={s.head}>
+        <Text style={s.name}>{w.name} limit</Text>
+        <Text style={s.value} testID={`limit-${lim.period}-value`}>{lim.limit ? `${credits(lim.limit)} credits` : "No limit"}</Text>
       </View>
-      <View style={s.track}><View style={[s.fill, { width: `${pct}%` }, pct >= 100 && { backgroundColor: colors.danger }]} /></View>
+      {lim.limit ? (
+        <>
+          <View style={s.track}><View style={[s.fill, { width: `${pct}%` }, pct >= 100 && { backgroundColor: colors.danger }]} /></View>
+          <Text style={s.muted} testID={`limit-${lim.period}-progress`}>
+            {credits(lim.spent)} of {credits(lim.limit)} credits used {w.word}. {w.resets}
+          </Text>
+        </>
+      ) : (
+        <Text style={s.muted}>{credits(lim.spent)} credits spent {w.word}.</Text>
+      )}
+      {lim.pending && (
+        <Text style={s.muted} testID={`limit-${lim.period}-pending`}>
+          {lim.pending.limit == null ? "Removing this limit" : `Changing to ${credits(lim.pending.limit)} credits`} takes effect {pacific(lim.pending.at)} Pacific.
+        </Text>
+      )}
+      {editing ? (
+        <View style={s.row}>
+          <TextInput testID={`limit-${lim.period}-input`} value={value} onChangeText={(v) => setValue(v.replace(/[^0-9]/g, ""))}
+            inputMode="numeric" keyboardType="number-pad" placeholder="Credits" placeholderTextColor={colors.muted}
+            accessibilityLabel={`${w.name} limit in credits`} style={s.input} />
+          <Button testID={`limit-${lim.period}-save`} label="Save" onPress={() => save(Number(value))} busy={busy} disabled={!Number(value)} />
+          <Button kind="ghost" label="Cancel" onPress={() => setEditing(false)} />
+        </View>
+      ) : (
+        <View style={s.row}>
+          <Pressable testID={`limit-${lim.period}-edit`} onPress={() => setEditing(true)} accessibilityRole="button">
+            <Text style={s.link}>{lim.limit ? "Change" : "Set a limit"}</Text>
+          </Pressable>
+          {lim.limit != null && !onBreak && (
+            <Pressable testID={`limit-${lim.period}-remove`} onPress={() => save(null)} accessibilityRole="button">
+              <Text style={s.link}>Remove</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+      {onBreak && editing && <Text style={s.muted}>During a break you can lower a limit but not raise or remove it.</Text>}
+      <ErrorText>{error}</ErrorText>
     </View>
   );
 }
 
 const s = StyleSheet.create({
   label: { color: colors.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1 },
-  muted: { color: colors.muted, fontSize: 12 },
-  body: { color: colors.text, fontSize: 14 },
-  row: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  chip: { borderWidth: 1, borderColor: colors.line, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6 },
-  chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  head: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
+  name: { color: colors.text, fontSize: 15, fontWeight: "700" },
+  value: { color: colors.text, fontSize: 15 },
+  muted: { color: colors.muted, fontSize: 13, lineHeight: 18 },
+  body: { color: colors.text, fontSize: 14, lineHeight: 20 },
+  link: { color: colors.accent, fontWeight: "700", fontSize: 14 },
+  row: { flexDirection: "row", gap: 12, flexWrap: "wrap", alignItems: "center" },
+  chip: { borderWidth: 1, borderColor: colors.line, borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8 },
   chipText: { color: colors.text, fontWeight: "700" },
   track: { height: 6, backgroundColor: colors.line, borderRadius: 3, overflow: "hidden" },
   fill: { height: "100%", backgroundColor: colors.accent },
+  input: { flex: 1, minWidth: 0, backgroundColor: colors.bg, color: colors.text, borderColor: colors.line, borderWidth: 1, borderRadius: radius,
+    paddingHorizontal: 12, paddingVertical: 8, fontSize: 16 },
+  divider: { height: 1, backgroundColor: colors.line },
 });
