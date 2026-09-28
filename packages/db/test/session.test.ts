@@ -114,7 +114,7 @@ describe("opening session", () => {
     await expect(run("select notify_order($1, $2)", [orderIds[0], staff])).rejects.toThrow(/clip_not_ready/);
     await run("select mark_clip_ready($1, 'mux-clip-1', $2)", [orderIds[0], staff]);
     await expect(run("select notify_order($1, $2)", [orderIds[0], staff])).rejects.toThrow(/contents_not_finalized/);
-    for (let slot = 1; slot <= 14; slot++) await run("select log_pack_card($1, $2, $3, 'nonfoil', 'NM', null, $4)", [pack.pack_opening_id, slot, card, staff]);
+    for (let slot = 1; slot <= 14; slot++) await run("select log_pack_card($1, $2, 'card', $3, 'nonfoil', 'NM', null, $4)", [pack.pack_opening_id, slot, card, staff]);
     await run("select finalize_pack_contents($1, $2)", [pack.pack_opening_id, staff]);
     await run("select notify_order($1, $2)", [orderIds[0], staff]);
     await run("select complete_session($1, 'mux-asset', $2)", [s, staff]);

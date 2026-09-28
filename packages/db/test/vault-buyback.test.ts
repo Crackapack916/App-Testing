@@ -22,7 +22,7 @@ async function pull(user: string, contents: { card: string; finish?: string; ser
   await atTime(db, t, "select open_box($1, $2, 0, $3)", [s, box, staff]);
   const [pack] = await atTime(db, t, "select * from open_next_pack($1, 0, $2)", [s, staff]);
   for (const [i, c] of contents.entries()) {
-    await db.q("select log_pack_card($1, $2, $3, $4, 'NM', $5, $6)", [pack.pack_opening_id, i + 1, c.card, c.finish ?? "nonfoil", c.serial ?? null, staff]);
+    await db.q("select log_pack_card($1, $2, 'card', $3, $4, 'NM', $5, $6)", [pack.pack_opening_id, i + 1, c.card, c.finish ?? "nonfoil", c.serial ?? null, staff]);
   }
   await atTime(db, t, "select finalize_pack_contents($1, $2)", [pack.pack_opening_id, staff]);
   return pack.pack_opening_id as string;
@@ -48,7 +48,7 @@ describe("vault classification at pull", () => {
     expect(held.map((r) => r.card_id).sort()).toEqual([big, foil, unpricedRare, serial].sort());
     expect(await db.q("select * from vault_invariant_violations")).toEqual([]);
 
-    await expect(db.q("select log_pack_card($1, 1, $2, 'nonfoil', 'NM', null, null)", [po, big])).rejects.toThrow(/finalized/);
+    await expect(db.q("select log_pack_card($1, 1, 'card', $2, 'nonfoil', 'NM', null, null)", [po, big])).rejects.toThrow(/finalized/);
     await expect(db.q("delete from pack_contents where pack_opening_id = $1", [po])).rejects.toThrow(/finalized/);
   });
 });
@@ -185,6 +185,6 @@ describe("clear_pack_card", () => {
     const u = await makeUser(db, { credits: 2000 });
     const c = await makeCard(db, { priceCents: 5 });
     const po = await pull(u, [{ card: c }]);
-    await expect(db.q("select clear_pack_card($1, 1)", [po])).rejects.toThrow(/pack_contents_finalized/);
+    await expect(db.q("select clear_pack_card($1, 1, null)", [po])).rejects.toThrow(/pack_contents_finalized/);
   });
 });

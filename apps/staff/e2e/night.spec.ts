@@ -50,24 +50,49 @@ test("a full night: lock, film in strict order, log cards, notify", async ({ pag
   await expect(page.getByText("Queue complete")).toBeVisible();
   await page.getByTestId("complete").click();
 
-  // Log cards: collector numbers only, "f" suffix for foil, Ctrl+Enter finalizes.
+  // Log cards from the locked queue: number, then finish, then Enter. Keyboard only.
   await page.keyboard.press("l");
   const collector = page.getByTestId("collector");
   await collector.fill("999");
-  await collector.press("Enter");
   await expect(page.getByText("No FDN #999.")).toBeVisible();
   for (let pack = 0; pack < 3; pack++) {
-    for (const entry of ["101", "7", "55f"]) {
-      await collector.fill(entry);
-      await collector.press("Enter");
+    for (const [num, foil] of [["101", false], ["7", false], ["55", true]] as const) {
+      await collector.fill(num);
+      await expect(page.getByTestId("preview")).toContainText(`FDN #${num}`);   // resolved: image, name, price
+      if (foil) {
+        await collector.press("Tab");                                          // into the finish group
+        await page.keyboard.press("ArrowRight");                               // nonfoil to foil
+        await expect(page.getByTestId("finish-foil")).toBeChecked();
+        await page.keyboard.press("Enter");
+      } else {
+        await collector.press("Enter");
+      }
       await expect(collector).toHaveValue("");
+      await expect(collector).toBeFocused();
     }
-    await expect(page.getByTestId("contents").locator("tbody tr")).toHaveCount(3);
+    if (pack === 0) {
+      await page.getByTestId("add-token").click();
+      await expect(page.getByTestId("count")).toHaveText("3 cards + 1 other");
+    }
     await expect(page.getByTestId("contents")).toContainText("foil");
     if (pack === 0) await shot(page, "3-log-cards");
     await collector.press("Control+Enter");
   }
   await expect(page.getByText("All opened packs are logged.")).toBeVisible();
+
+  // A change after approval needs a reason and is kept in the history.
+  await page.getByTestId("packs").locator("li").first().click();
+  await expect(page.getByTestId("approved-banner")).toBeVisible();
+  await page.getByTestId("amend-2").click();
+  await page.getByTestId("amend-reason").fill("Video shows a foil");
+  await collector.fill("7");
+  await expect(page.getByTestId("preview")).toContainText("FDN #7");
+  await page.getByTestId("finish-foil").check();
+  await page.getByTestId("add").click();
+  await expect(page.getByTestId("contents").locator("tbody tr").nth(1)).toContainText("foil");
+  await page.getByTestId("history").locator("summary").click();
+  await expect(page.getByTestId("history")).toContainText("amended slot 2");
+  await expect(page.getByTestId("history")).toContainText("Video shows a foil");
 
   // Notify: both orders are ready.
   await page.keyboard.press("n");

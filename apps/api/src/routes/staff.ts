@@ -169,6 +169,22 @@ async function closeFinishedClips(c: { get: (k: "db" | "user" | "services") => a
 
 // Logging contents -------------------------------------------------------------------
 
+// Logging starts from the locked queue: every position, and whether its pack is opened,
+// being logged, or approved. Only opened packs can be logged.
+staff.get("/batches/:id/log-queue", async (c) => {
+  const { rows } = await c.get("db").query(
+    `select q.position, q.order_id, q.pack_index, o.quantity as order_packs, p.set_code, p.name as product, s.slot_count,
+            po.id as pack_id, po.contents_finalized_at as approved_at,
+            (select count(*) from pack_contents pc where pc.pack_opening_id = po.id and pc.kind = 'card')::int as cards,
+            (select count(*) from pack_contents pc where pc.pack_opening_id = po.id)::int as entries
+     from queue_entries q join orders o on o.id = q.order_id join products p on p.id = q.product_id
+     join mtg_sets s on s.code = p.set_code
+     left join pack_openings po on po.queue_entry_id = q.id and po.status = 'opened'
+     where q.batch_id = $1 and q.position is not null order by q.position`, [c.req.param("id")]);
+  return c.json({ queue: rows });
+});
+
+// Kept for the notify and session screens.
 staff.get("/batches/:id/packs", async (c) => {
   const { rows } = await c.get("db").query(
     `select po.id, q.position, q.order_id, p.set_code, p.name as product, po.contents_finalized_at,
@@ -178,53 +194,97 @@ staff.get("/batches/:id/packs", async (c) => {
   return c.json({ packs: rows });
 });
 
+const LOGGED_CARD = `pc.slot, pc.kind, pc.card_id, pc.finish, pc.condition, cd.name, cd.set_code, cd.collector_number, cd.rarity,
+  pr.market_cents::int, (select uris ->> 'small' from card_images ci where ci.card_id = pc.card_id) as image_small`;
+
 staff.get("/packs/:id", async (c) => {
-  const { rows } = await c.get("db").query(
-    `select pc.slot, pc.card_id, pc.finish, pc.condition, pc.serial_number, cd.name, cd.collector_number, cd.rarity, cd.set_code,
-            pr.market_cents::int
-     from pack_contents pc join cards cd on cd.id = pc.card_id
+  const db = c.get("db");
+  const id = c.req.param("id");
+  const { rows: [pack] } = await db.query(
+    `select po.id, q.position, q.order_id, q.pack_index, o.quantity as order_packs, p.set_code, p.name as product, s.slot_count,
+            po.contents_finalized_at as approved_at, po.count_override_reason
+     from pack_openings po join queue_entries q on q.id = po.queue_entry_id join orders o on o.id = q.order_id
+     join products p on p.id = q.product_id join mtg_sets s on s.code = p.set_code where po.id = $1`, [id]);
+  if (!pack) throw new ApiError("pack_not_opened", 404);
+  const { rows: cards } = await db.query(
+    `select ${LOGGED_CARD} from pack_contents pc left join cards cd on cd.id = pc.card_id
      left join card_prices_current pr on pr.card_id = pc.card_id and pr.finish = pc.finish
-     where pc.pack_opening_id = $1 order by pc.slot`, [c.req.param("id")]);
-  return c.json({ cards: rows });
+     where pc.pack_opening_id = $1 order by pc.slot`, [id]);
+  const { rows: history } = await db.query(
+    `select e.created_at, e.slot, e.action, e.kind, e.finish, e.old_finish, e.reason, u.email as actor,
+            n.name as card, n.collector_number as num, o.name as old_card, o.collector_number as old_num
+     from pack_content_events e left join users u on u.id = e.actor
+     left join cards n on n.id = e.card_id left join cards o on o.id = e.old_card_id
+     where e.pack_opening_id = $1 order by e.id desc`, [id]);
+  return c.json({ pack, cards, history });
 });
 
 staff.put("/packs/:id/cards/:slot", async (c) => {
-  const b = await c.req.json<{ card_id: string; finish?: string; condition?: string; serial_number?: string }>();
-  await c.get("db").query("select log_pack_card($1, $2, $3, $4, $5, $6, $7)",
-    [c.req.param("id"), Number(c.req.param("slot")), b.card_id, b.finish ?? "nonfoil", b.condition ?? "NM", b.serial_number ?? null, c.get("user").id]);
+  const b = await c.req.json<{ kind?: string; card_id?: string; finish?: string; condition?: string; serial_number?: string }>();
+  await c.get("db").query("select log_pack_card($1, $2, $3, $4, $5, $6, $7, $8)",
+    [c.req.param("id"), Number(c.req.param("slot")), b.kind ?? "card", b.card_id ?? null, b.finish ?? null, b.condition ?? "NM",
+     b.serial_number ?? null, c.get("user").id]);
   return c.json({ ok: true });
 });
 
 staff.delete("/packs/:id/cards/:slot", async (c) => {
-  await c.get("db").query("select clear_pack_card($1, $2)", [c.req.param("id"), Number(c.req.param("slot"))]);
+  await c.get("db").query("select clear_pack_card($1, $2, $3)", [c.req.param("id"), Number(c.req.param("slot")), c.get("user").id]);
   return c.json({ ok: true });
 });
 
+// Approve: checks the count against the set's slot count (a written override when it differs).
 staff.post("/packs/:id/finalize", async (c) => {
-  const { rows: [r] } = await c.get("db").query("select finalize_pack_contents($1, $2) as n", [c.req.param("id"), c.get("user").id]);
-  return c.json({ cards: r.n });
+  const b = await c.req.json<{ count_override_reason?: string }>().catch(() => ({} as { count_override_reason?: string }));
+  const { rows: [r] } = await c.get("db").query("select finalize_pack_contents($1, $2, $3) as n",
+    [c.req.param("id"), c.get("user").id, b.count_override_reason ?? null]);
+  return c.json({ entries: r.n });
 });
 
-// Set scoped collector number lookup: the logger types "123" and the set comes from the pack.
+// A change after approval: reason required, logged, and the customer's vault follows.
+staff.post("/packs/:id/amend", async (c) => {
+  const b = await c.req.json<{ slot: number; kind?: string | null; card_id?: string | null; finish?: string | null; reason: string }>();
+  await c.get("db").query("select amend_pack_card($1, $2, $3, $4, $5, $6, $7)",
+    [c.req.param("id"), b.slot, b.kind ?? null, b.card_id ?? null, b.finish ?? null, b.reason, c.get("user").id]);
+  return c.json({ ok: true });
+});
+
+// A printing by set code and collector number: our table first, then Scryfall (cached).
+const LOOKUP = `select cd.id, cd.name, cd.set_code, cd.collector_number, cd.rarity, cd.finishes,
+    (select json_object_agg(p.finish, p.market_cents) from card_prices_current p where p.card_id = cd.id) as prices,
+    (select uris ->> 'normal' from card_images ci where ci.card_id = cd.id) as image_url
+  from cards cd where cd.set_code = upper($1) and lower(cd.collector_number) = lower($2)`;
+
+staff.get("/cards/lookup", async (c) => {
+  const set = (c.req.query("set") ?? "").trim();
+  const num = (c.req.query("num") ?? "").trim();
+  if (!set || !num) throw new ApiError("unknown_card", 404);
+  const db = c.get("db");
+  let { rows: [card] } = await db.query(LOOKUP, [set, num]);
+  let source = "local";
+  const provider = c.get("services").cardData;
+  if (!card && provider) {
+    const row = await provider.lookup(set, num).catch(() => null);
+    if (row) {
+      await db.query("select import_scryfall_cards($1, now())", [JSON.stringify([row])]);
+      ({ rows: [card] } = await db.query(LOOKUP, [set, num]));
+      source = provider.name;
+    }
+  }
+  if (!card) throw new ApiError("unknown_card", 404);
+  return c.json({ card, source });
+});
+
+// Name search for the logger (kept for finding a number by name).
 staff.get("/cards", async (c) => {
   const set = c.req.query("set");
-  const num = c.req.query("num");
-  const q = c.req.query("q");
-  const db = c.get("db");
-  const { rows } = num
-    ? await db.query(
-        `select id, name, set_code, collector_number, rarity, finishes from cards
-         where set_code = $1 and collector_number = $2`, [set, num])
-    : await db.query(
-        `select id, name, set_code, collector_number, rarity, finishes from cards
-         where ($1::text is null or set_code = $1) and name ilike '%' || $2 || '%'
-         order by similarity(name, $2) desc limit 15`, [set ?? null, q ?? ""]);
+  const q = c.req.query("q") ?? "";
+  const { rows } = await c.get("db").query(
+    `select id, name, set_code, collector_number, rarity, finishes from cards
+     where ($1::text is null or set_code = upper($1)) and name_folded like '%' || lower(f_unaccent($2::text)) || '%'
+     order by similarity(name_folded, lower(f_unaccent($2::text))) desc limit 15`, [set ?? null, q]);
   return c.json({ cards: rows });
 });
 
-// Notifying ---------------------------------------------------------------------------
-
-// Re-requests a failed clip with the offsets already recorded for it.
 staff.post("/orders/:id/clip/retry", async (c) => {
   const db = c.get("db");
   const id = c.req.param("id");

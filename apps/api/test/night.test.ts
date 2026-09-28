@@ -213,8 +213,8 @@ describe("a full night over the API", () => {
     expect((await call("POST", `/staff/batches/${batchId}/notify`, { token: staff.token, at: DURING(6) })).body.notified).toBe(0);
 
     // Logging: set scoped collector number lookup, then finalize each pack.
-    const found = await call("GET", "/staff/cards?set=FDN&num=101", { token: staff.token });
-    expect(found.body.cards[0].id).toBe(rare);
+    const found = await call("GET", "/staff/cards/lookup?set=FDN&num=101", { token: staff.token });
+    expect(found.body.card.id).toBe(rare);
     const logList = (await call("GET", `/staff/batches/${batchId}/packs`, { token: staff.token })).body.packs;
     expect(logList.map((x: any) => x.position)).toEqual([1, 2, 3]);
     for (const [i, pk] of logList.entries()) {
@@ -222,7 +222,7 @@ describe("a full night over the API", () => {
       await call("PUT", `/staff/packs/${pk.id}/cards/2`, { token: staff.token, body: { card_id: common } });
       await call("PUT", `/staff/packs/${pk.id}/cards/3`, { token: staff.token, body: { card_id: rare } });
       await call("DELETE", `/staff/packs/${pk.id}/cards/3`, { token: staff.token }); // mis-logged, removed
-      expect((await call("POST", `/staff/packs/${pk.id}/finalize`, { token: staff.token, at: DURING(7) })).body.cards).toBe(2);
+      expect((await call("POST", `/staff/packs/${pk.id}/finalize`, { token: staff.token, at: DURING(7) })).body.entries).toBe(2);
     }
 
     // Alice is ready (clip + contents). Bob's clip closes when the session completes.

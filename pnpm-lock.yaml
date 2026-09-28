@@ -14,6 +14,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@crackapack/catalog':
+        specifier: workspace:*
+        version: link:../../packages/catalog
       '@crackapack/payments':
         specifier: workspace:*
         version: link:../../packages/payments

@@ -1,6 +1,7 @@
 import type pg from "pg";
 import type { PaymentProcessor } from "@crackapack/payments";
 import type { EmailProvider } from "./email";
+import type { CardDataProvider } from "@crackapack/catalog";
 
 export type Role = "customer" | "staff" | "admin";
 export type User = { id: string; role: Role; display_name: string | null };
@@ -19,6 +20,8 @@ export interface Services {
   dobKey: Buffer | null;
   /** Customer and staff email. */
   email: EmailProvider;
+  /** Looks up a printing our table doesn't have yet (very new sets), for pack logging. */
+  cardData?: CardDataProvider;
   /** Public site origin for links in emails, e.g. https://crackapack-preview.vercel.app */
   appUrl: string;
   /** Produces each order's clip from the session recording. */

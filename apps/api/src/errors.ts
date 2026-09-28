@@ -60,7 +60,11 @@ const CODES: Record<string, [number, string]> = {
   // contents and notifications
   pack_not_opened: [409, "That pack hasn't been opened."],
   pack_contents_finalized: [409, "That pack's contents are already final."],
-  pack_contents_empty: [409, "Log the pack's cards before finalizing."],
+  pack_contents_empty: [409, "Log the pack's cards before approving."],
+  finish_not_available: [400, "That printing doesn't come in that finish."],
+  card_count_mismatch: [409, "The card count doesn't match this set's pack. Recount, or approve with a written reason."],
+  pack_not_approved: [409, "That pack isn't approved yet. Edit it directly."],
+  card_left_vault: [409, "That card has already left the customer's vault (shipped or sold), so it can't be changed here."],
   order_not_fully_opened: [409, "Not every pack in that order is open yet."],
   clip_not_ready: [409, "The clip isn't ready yet."],
   contents_not_finalized: [409, "Finish logging every pack in that order first."],

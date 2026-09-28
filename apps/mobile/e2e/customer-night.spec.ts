@@ -26,7 +26,7 @@ async function runNight(request: APIRequestContext) {
   for (let i = 0; i < 3; i++) await call("post", `/staff/sessions/${session_id}/next`, at(2 + i));
   await call("post", `/staff/sessions/${session_id}/complete`, at(6));
   const { packs } = await call("get", `/staff/batches/${batch.id}/packs`, at(7));
-  const find = async (num: string) => (await call("get", `/staff/cards?set=FDN&num=${num}`, at(7))).cards[0].id;
+  const find = async (num: string) => (await call("get", `/staff/cards/lookup?set=FDN&num=${num}`, at(7))).card.id;
   const [mythic, common, uncommon] = [await find("101"), await find("7"), await find("55")];
   const contents = [[common, uncommon, mythic], [common, uncommon, common], [uncommon, common, common]];
   for (const [i, pack] of packs.entries()) {
