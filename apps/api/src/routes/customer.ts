@@ -4,6 +4,8 @@ import { optionalUser, requireUser } from "../auth";
 import { ApiError } from "../errors";
 import { IMAGE_SQL, withImages } from "../images";
 import type { Env } from "../context";
+import { SUPPORT_EMAIL } from "../email-templates";
+import { sendSafely, staffAlert } from "../notify";
 
 /** Customer facing routes. Every write goes through a database function. */
 export const customer = new Hono<Env>();
@@ -72,7 +74,7 @@ customer.get("/me", async (c) => {
 });
 
 // Spending: daily, weekly and monthly limits (each optional) and breaks.
-export const BUSINESS_EMAIL = "crackapack.business@gmail.com";
+export const BUSINESS_EMAIL = SUPPORT_EMAIL;
 
 customer.get("/me/limits", async (c) => {
   const db = c.get("db");
@@ -106,9 +108,11 @@ customer.put("/me/limits/:period", async (c) => {
   const { credits } = await c.req.json<{ credits: number | null }>();
   const db = c.get("db");
   const { rows: [r] } = await db.query("select set_spend_limit($1, $2, $3) as result", [c.get("user").id, c.req.param("period"), credits]);
-  const { rows: [u] } = await db.query("select email from users where id = $1", [c.get("user").id]);
-  await c.get("services").email.send({ kind: "limit_changed", to: u.email,
-    data: { period: c.req.param("period"), credits, pending: r.result === "pending" } });
+  const { rows: [u] } = await db.query(
+    `select u.email, case $2 when 'daily' then l.pending_daily_at when 'weekly' then l.pending_weekly_at else l.pending_monthly_at end as at
+     from users u left join spend_limits l on l.user_id = u.id where u.id = $1`, [c.get("user").id, c.req.param("period")]);
+  await sendSafely(c.get("services"), { kind: "limit_changed", to: u.email,
+    data: { period: c.req.param("period"), credits, pending: r.result === "pending", at: u.at } });
   return c.json({ result: r.result });
 });
 
@@ -117,7 +121,7 @@ customer.post("/me/break", async (c) => {
   const db = c.get("db");
   const { rows: [r] } = await db.query("select take_break($1, $2) as until", [c.get("user").id, hours]);
   const { rows: [u] } = await db.query("select email from users where id = $1", [c.get("user").id]);
-  await c.get("services").email.send({ kind: "break_started", to: u.email, data: { until: r.until } });
+  await sendSafely(c.get("services"), { kind: "break_started", to: u.email, data: { until: r.until } });
   return c.json({ break_until: r.until });
 });
 
@@ -136,6 +140,13 @@ customer.post("/orders", async (c) => {
   const body = await c.req.json<{ product_id: string; quantity: number }>();
   const { rows: [r] } = await c.get("db").query("select place_order($1, $2, $3) as id",
     [c.get("user").id, body.product_id, body.quantity]);
+  const { rows: [o] } = await c.get("db").query(
+    `select u.email, o.quantity, o.total_credits::int, s.name as set_name, p.id as product_id, p.name as product,
+            coalesce(product_available_packs(p.id), 0) as left
+     from orders o join users u on u.id = o.user_id join products p on p.id = o.product_id join mtg_sets s on s.code = p.set_code
+     where o.id = $1`, [r.id]);
+  await sendSafely(c.get("services"), { kind: "order_confirmation", to: o.email, data: { packs: o.quantity, set_name: o.set_name, credits: o.total_credits } });
+  if (o.left === 0) await staffAlert(c.get("services"), `${o.product} sold out`, `The last sellable pack of ${o.product} was just ordered. Receive more boxes on the Stock screen, or leave it sold out.`);
   return c.json({ order_id: r.id }, 201);
 });
 
@@ -316,6 +327,10 @@ customer.post("/me/buyback", async (c) => {
     [c.get("user").id, JSON.stringify(items), `${c.get("user").id}:${idempotency_key}`]);
   const { rows: [req] } = await db.query(
     "select id, status, total_credits::int, hold_until from buyback_requests where id = $1", [r.id]);
+  const { rows: [bi] } = await db.query(
+    "select u.email, (select coalesce(sum(qty), 0)::int from buyback_items where request_id = $1) as cards from users u where u.id = $2", [r.id, c.get("user").id]);
+  await sendSafely(c.get("services"), { kind: "sellback_receipt", to: bi.email,
+    data: { cards: bi.cards, credits: req.total_credits, hold_until: req.status === "held" ? req.hold_until : null } });
   return c.json(req, 201);
 });
 

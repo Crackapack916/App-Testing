@@ -7,22 +7,23 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 * The queue lock lives in Postgres (`packages/db/migrations/0005_queue.sql`), not in app code. App code calls the functions; it never writes `orders`, `queue_entries`, `batches`, `credit_entries`, `vault_entries` or `custody_events` directly.
 * Staff never pick a customer or a pack. `open_next_pack` takes no customer or entry argument; keep it that way.
 * Ledgers are append only. Balances are caches updated by triggers and guarded by CHECK constraints.
-* Card data and prices come from MTGJSON. Vendor ids live only in `card_external_ids`.
+* Card data and prices come from Scryfall's daily bulk file for the test run (behind `CardDataProvider`); MTGJSON is the planned source before launch. Vendor ids live only in `card_external_ids`.
 * Business logic reads time from `app_now()`, never `now()`. The override works only in test mode.
 * 1 credit = $0.01. Store money as integer credits or cents, never floats.
 
 ## Infrastructure
 * Database: Neon project `calm-art-68010363` (us-west-2, Postgres 16). Connection string lives in `.env`, never committed.
-* Payments: Stripe sandbox `acct_1UKC1BRkzwzDtkIa`, product `prod_VL0BnbAdob27Ft` "CrackAPack Credits". Bundles are prices with lookup keys `credits_900`, `credits_2550`, `credits_4950`, `credits_7200`, `credits_9300`, one per pack ladder tier; code references lookup keys, never price ids. Credits are sold through web checkout, not in app purchase.
+* Payments: Stripe sandbox `acct_1UKC1BRkzwzDtkIa`, product `prod_VL0BnbAdob27Ft` "CrackAPack Credits". Bundles are prices with lookup keys `credits_1000`, `credits_2850`, `credits_5400`, one per pack ladder tier (1, 3, 6 packs); code references lookup keys, never price ids. Credits are sold through web checkout, not in app purchase.
 * Processors plug in through `PaymentProcessor` in `packages/payments`. Webhooks go through `handleWebhook`, which writes only via `record_credit_purchase` and `refund_purchased_credits`.
 * Mode is `test` until counsel clears the structure.
 * Sell back (buyback) is off for the test run: `system_config.buyback_enabled` defaults to false and a trigger refuses any buyback request while it is off. Customers keep cards in the vault or ship them. Turn it on only when the resale side is built.
-* Compliance mitigations in the database: 18+ age gate (`set_profile`, birthdate locked once verified), rolling 24 hour and 30 day spend caps with platform maximums (raising a limit waits 24 hours), and customer breaks that can't be shortened. Enforced by the `orders_spend_guard` trigger.
-* Scheduled jobs (`packages/db/scripts/jobs.ts`, every 15 minutes via `.github/workflows/jobs.yml`): lock queues past their cutoff, release held buybacks.
+* Compliance mitigations in the database: 18+ age gate (`register_account`, `confirm_age`, birthdate encrypted and locked), optional daily, weekly and monthly spending limits on Pacific calendar windows (`set_spend_limit`; loosening waits `limit_loosen_delay_hours`, 0 by default), and breaks of 24 hours, 7 or 30 days that only staff can lift, with a reason. Enforced by the `orders_spend_guard` trigger.
+* Scheduled jobs (`apps/api/scripts/jobs.ts`, every 15 minutes via `.github/workflows/jobs.yml`): lock queues past their cutoff, release held buybacks, send drop reminders and break ended emails.
 
-* Card data: `packages/catalog` imports MTGJSON (AllPrintings, AllPricesToday) through `import_sets`, `import_cards` and `import_prices`. Cards match on (set, collector number) so internal ids never change. Price history is kept only for sets we sell and cards someone holds. Runs from `.github/workflows/mtgjson.yml` (needs the `NEON_DATABASE_URL` secret); this container cannot reach mtgjson.com.
+* Card data: `packages/catalog` imports Scryfall bulk data daily (`.github/workflows/scryfall.yml`, needs `NEON_DATABASE_URL`) through `import_scryfall_sets` and `import_scryfall_cards`. Cards match on (set, collector number) so internal ids never change. Search runs on our own database; never call Scryfall per keystroke. This container cannot reach Scryfall or mtgjson.com.
 
-* Sign in: Clerk. The API verifies Clerk session tokens locally with `CLERK_JWT_KEY` and links accounts through `upsert_auth_user`; staff are promoted with `set_user_role` (admin only). Apps fall back to pilot sign in when no Clerk key is set.
+* Sign in: our own email and password (`apps/api/src/routes/auth.ts`, scrypt hashes, HS256 tokens). Staff are promoted with `set_user_role` (admin only).
+* Email: every customer and staff message goes through `EmailProvider` (`apps/api/src/email.ts`, templates in `email-templates.ts`), Gmail SMTP for the test run. The cracked email never names cards or values. Support address everywhere: crackapack.business@gmail.com.
 * Pack videos: one file per opened pack, uploaded from the staff browser straight to Vercel Blob (private) with a client token from `/staff/videos/token`; never through an API route. `VIDEO_DIR` (local disk) is for pilot runs and tests only and is refused in production. Customers watch through expiring signed links after `approve_and_notify_batch`. The old per order clips (`apps/api/src/clips.ts`, Mux) are kept only as custody data.
 * Hosting: Vercel (`apps/api/src/index.ts` for the API, `apps/staff` as a static site). Every account and key is listed in `docs/SETUP.md`.
 

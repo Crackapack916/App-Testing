@@ -3,7 +3,7 @@ import { StripeProcessor } from "@crackapack/payments";
 import { createApp } from "./app";
 import { linkClips, muxClips } from "./clips";
 import { dobKeyFrom } from "./secrets";
-import { logEmail } from "./email";
+import { gmailEmail, logEmail } from "./email";
 import { scryfallProvider } from "@crackapack/catalog/lookup";
 import { blobStorage, localVideos } from "./videos";
 
@@ -29,6 +29,7 @@ export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
   // Serverless instances should each hold only a few connections (PG_POOL_MAX=3 on Vercel).
   const pool = new pg.Pool({ connectionString: required("DATABASE_URL"), max: Number(env.PG_POOL_MAX ?? 10) });
 
+  const appUrl = (env.APP_URL ?? "http://localhost:8081").replace(/\/$/, "");
   const app = createApp({
     pool,
     jwtSecret: required("JWT_SECRET"),
@@ -44,8 +45,11 @@ export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
     // Vercel Blob in the cloud; VIDEO_DIR (local disk) for pilot runs and tests.
     videos: env.BLOB_READ_WRITE_TOKEN ? blobStorage(env.BLOB_READ_WRITE_TOKEN)
       : env.VIDEO_DIR ? localVideos(env.VIDEO_DIR, required("JWT_SECRET")) : undefined,
-    email: logEmail(),
-    appUrl: (env.APP_URL ?? "http://localhost:8081").replace(/\/$/, ""),
+    // Gmail once Tyson adds the app password; until then emails are printed to the log.
+    email: env.GMAIL_APP_PASSWORD
+      ? gmailEmail({ user: env.GMAIL_USER ?? "crackapack.business@gmail.com", appPassword: env.GMAIL_APP_PASSWORD, appUrl, mailingAddress: env.MAILING_ADDRESS })
+      : logEmail(),
+    appUrl,
     clips: env.MUX_TOKEN_ID
       ? muxClips({ tokenId: env.MUX_TOKEN_ID, tokenSecret: required("MUX_TOKEN_SECRET"), liveStreamId: required("MUX_LIVE_STREAM_ID"), webhookSecret: required("MUX_WEBHOOK_SECRET") })
       : linkClips,

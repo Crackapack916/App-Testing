@@ -1,5 +1,6 @@
 name: jobs
-# Locks queues at the cutoff and releases held buybacks. See packages/db/scripts/jobs.ts.
+# Locks queues at the cutoff, releases held buybacks, and sends drop reminders and break ended emails.
+# See apps/api/scripts/jobs.ts. Emails need the GMAIL_APP_PASSWORD secret (and MAILING_ADDRESS); without it they are only logged.
 # Requires the repository secret NEON_DATABASE_URL.
 on:
   schedule:
@@ -27,6 +28,10 @@ jobs:
     concurrency: scheduled-jobs
     env:
       DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      GMAIL_USER: crackapack.business@gmail.com
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      MAILING_ADDRESS: ${{ vars.MAILING_ADDRESS }}
+      APP_URL: https://crackapack-preview.vercel.app
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -35,4 +40,4 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @crackapack/db exec tsx scripts/jobs.ts
+      - run: pnpm --filter @crackapack/api exec tsx scripts/jobs.ts

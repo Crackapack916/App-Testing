@@ -265,7 +265,10 @@ describe("a full night over the API", () => {
 
     expect((await call("POST", `/staff/batches/${batchId}/approve`, { token: staff.token, at: DURING(11) })).body.notified).toBe(2);
     expect((await call("GET", "/staff/tonight", { token: staff.token, at: DURING(11) })).body.batch).toBeNull();
-    expect(emails.map((e) => [e.kind, e.to])).toEqual([["pack_cracked", "alice@x.test"], ["pack_cracked", "bob@x.test"]]);
+    expect(emails.map((e) => [e.kind, e.to])).toEqual([
+      ["order_confirmation", "alice@x.test"], ["order_confirmation", "bob@x.test"],
+      ["staff_alert", "crackapack.business@gmail.com"],   // the night is ready to approve
+      ["pack_cracked", "alice@x.test"], ["pack_cracked", "bob@x.test"]]);
 
     // Customer side: the Vault dot, Cracked today, the pack in pulled order, and the video link.
     expect((await call("GET", "/me", { token: alice.token })).body.unseen_cracked).toBe(1);

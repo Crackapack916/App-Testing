@@ -1,3 +1,4 @@
+import { sendSafely } from "../notify";
 import { Hono } from "hono";
 import { ApiError } from "../errors";
 import { issueToken, requireUser } from "../auth";
@@ -37,7 +38,7 @@ auth.post("/forgot", async (c) => {
   const { rows: [r] } = await c.get("db").query("select create_password_reset($1, $2) as user_id", [email ?? "", hashToken(token)]);
   const { email: mailer, appUrl } = c.get("services");
   if (r.user_id) {
-    await mailer.send({ kind: "password_reset", to: String(email).trim().toLowerCase(),
+    await sendSafely({ email: mailer }, { kind: "password_reset", to: String(email).trim().toLowerCase(),
       data: { link: `${appUrl}/reset-password?token=${encodeURIComponent(token)}` } });
   }
   // Always the same reply, whether or not the email has an account.

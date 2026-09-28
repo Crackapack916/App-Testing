@@ -1,9 +1,9 @@
 import { createElement, useEffect, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { X } from "lucide-react-native";
 import { Text } from "../../components/Text";
-import { ErrorText, Footer, Stage } from "../../components/bits";
+import { ErrorText, Footer, Stage, SUPPORT_EMAIL } from "../../components/bits";
 import { CardImage } from "../../components/CardImage";
 import { api } from "../../lib/api";
 import { dollars } from "../../lib/format";
@@ -61,6 +61,10 @@ export default function PackScreen() {
             ))}
           </View>
           <ErrorText>{pack ? null : error}</ErrorText>
+          <Text style={s.report} accessibilityRole="link" testID="report-problem"
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Problem with pack ${id}`)}`)}>
+            Report a problem with this pack
+          </Text>
         </View>
         <Footer onStage />
       </ScrollView>
@@ -77,5 +81,6 @@ const s = StyleSheet.create({
   video: { aspectRatio: 16 / 9, width: "100%", backgroundColor: stage.panel, borderRadius: radii.tile, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   section: { fontFamily: font.bodySemi, fontSize: 12, letterSpacing: 1.2, textTransform: "uppercase", color: stage.muted, marginTop: 8 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  report: { fontFamily: font.bodySemi, fontSize: 14, color: stage.accent, textDecorationLine: "underline", paddingVertical: 12 },
   price: { fontFamily: font.displaySemi, fontSize: 14, color: stage.text, marginTop: 4 },
 });

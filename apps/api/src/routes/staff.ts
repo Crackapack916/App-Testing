@@ -4,6 +4,7 @@ import { requireUser } from "../auth";
 import { ApiError } from "../errors";
 import type { ClipService, Env } from "../context";
 import type { localVideos } from "../videos";
+import { sendSafely, staffAlert } from "../notify";
 import { createWriteStream } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -243,6 +244,7 @@ staff.post("/packs/:id/finalize", async (c) => {
   const b = await c.req.json<{ count_override_reason?: string }>().catch(() => ({} as { count_override_reason?: string }));
   const { rows: [r] } = await c.get("db").query("select finalize_pack_contents($1, $2, $3) as n",
     [c.req.param("id"), c.get("user").id, b.count_override_reason ?? null]);
+  await alertIfBatchReady(c, c.req.param("id"));
   return c.json({ entries: r.n });
 });
 
@@ -304,6 +306,19 @@ staff.post("/orders/:id/clip/retry", async (c) => {
   if (out.status === "ready") await db.query("select mark_clip_ready($1, $2, $3)", [id, out.ref, c.get("user").id]);
   return c.json({ status: out.status });
 });
+
+/** Staff alert when the last pack of the night gets its video and approved cards. */
+async function alertIfBatchReady(c: { get: (k: "db" | "services") => any }, packId: string) {
+  const { rows: [b] } = await c.get("db").query(
+    `select b.id, b.batch_date::text,
+            not exists (select 1 from queue_entries q where q.batch_id = b.id and q.status = 'queued')
+            and not exists (select 1 from pack_openings po left join pack_videos v on v.pack_opening_id = po.id
+                            where po.batch_id = b.id and po.status = 'opened' and (po.contents_finalized_at is null or v.status is distinct from 'ready'))
+            and exists (select 1 from orders o where o.batch_id = b.id and o.status = 'queued') as ready
+     from pack_openings p join batches b on b.id = p.batch_id where p.id = $1`, [packId]);
+  if (b?.ready) await staffAlert(c.get("services"), `Night of ${b.batch_date} is ready to approve`,
+    "Every pack has a ready video and approved cards. Open Videos and press Approve and notify customers.");
+}
 
 /** Local storage links are paths on the API; Blob links are already absolute. */
 const absolute = (requestUrl: string, url: string) => new URL(url, requestUrl).toString();
@@ -371,6 +386,14 @@ staff.put("/videos/local/*", async (c) => {
   return c.json({ pathname });
 });
 
+// The staff browser reports a failed upload so the business inbox hears about it.
+staff.post("/alerts/upload-failed", async (c) => {
+  const b = await c.req.json<{ position?: number; message?: string }>();
+  await staffAlert(c.get("services"), `Video upload failed for queue ${Number(b.position) || "?"}`,
+    `${String(b.message ?? "").slice(0, 500)} (reported by ${c.get("user").display_name ?? "staff"})`);
+  return c.json({ ok: true });
+});
+
 staff.post("/packs/:id/video/start", async (c) => {
   await c.get("db").query("select start_pack_video($1, $2)", [c.req.param("id"), c.get("user").id]);
   return c.json({ ok: true });
@@ -389,6 +412,7 @@ staff.post("/packs/:id/video/finish", async (c) => {
   if (size !== b.size) throw new ApiError("video_size_mismatch");
   await c.get("db").query("select finish_pack_video($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     [id, b.pathname, size, b.sha256, b.duration_ms, b.content_type, b.thumbnail ?? null, b.recorded_at ?? null, c.get("user").id]);
+  await alertIfBatchReady(c, id);
   return c.json({ ok: true });
 });
 
@@ -424,12 +448,10 @@ staff.post("/batches/:id/approve", async (c) => {
      join products p on p.id = o.product_id join mtg_sets s on s.code = p.set_code
      where o.batch_id = $1 and o.status = 'queued' order by o.purchase_seq`, [id]);
   const { rows: [r] } = await db.query("select approve_and_notify_batch($1, $2) as n", [id, c.get("user").id]);
-  const email = c.get("services").email;
   const base = c.get("services").appUrl;
   for (const o of orders) {
     // A failed email never blocks the night: the Vault dot still shows it.
-    await email.send({ kind: "pack_cracked", to: o.email, data: { order_id: o.id, packs: o.quantity, set_name: o.set_name, url: `${base}/vault` } })
-      .catch((e) => console.error("email failed", e));
+    await sendSafely(c.get("services"), { kind: "pack_cracked", to: o.email, data: { order_id: o.id, packs: o.quantity, set_name: o.set_name, url: `${base}/vault` } });
   }
   return c.json({ notified: r.n });
 });
@@ -459,6 +481,10 @@ staff.post("/shipments/:id/shipped", async (c) => {
   const { tracking } = await c.req.json<{ tracking: string }>();
   if (!tracking?.trim()) throw new ApiError("tracking_required", 400);
   await c.get("db").query("select mark_shipped($1, $2)", [c.req.param("id"), tracking.trim()]);
+  const { rows: [sh] } = await c.get("db").query(
+    `select u.email, (select coalesce(sum(qty), 0)::int from shipment_items where shipment_id = s.id) as cards
+     from shipment_requests s join users u on u.id = s.user_id where s.id = $1`, [c.req.param("id")]);
+  await sendSafely(c.get("services"), { kind: "shipping_confirmation", to: sh.email, data: { cards: sh.cards, tracking: tracking.trim() } });
   return c.json({ ok: true });
 });
 
@@ -478,7 +504,7 @@ staff.post("/users/:id/lift-break", async (c) => {
   await db.query("select lift_break($1, $2, $3)", [c.req.param("id"), reason, c.get("user").id]);
   const { rows: [u] } = await db.query("select email from users where id = $1", [c.req.param("id")]);
   await db.query("select mark_break_end_emailed($1)", [c.req.param("id")]);
-  await c.get("services").email.send({ kind: "break_ended", to: u.email, data: { lifted: true } });
+  await sendSafely(c.get("services"), { kind: "break_ended", to: u.email, data: { lifted: true } });
   return c.json({ ok: true });
 });
 

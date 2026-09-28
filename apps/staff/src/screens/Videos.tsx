@@ -101,7 +101,10 @@ function UploadCell({ kind, row, onDone }: { kind: Kind; row: Row; onDone: () =>
     try {
       await uploadPackVideo(kind, row.pack_id!, f, (l, pct) => setStage({ label: l, pct }));
       setStage(null); setFile(null); onDone();
-    } catch (e) { setStage(null); setError((e as Error).message); }
+    } catch (e) {
+      setStage(null); setError((e as Error).message);
+      api("POST", "/staff/alerts/upload-failed", { position: row.position, message: (e as Error).message }).catch(() => {});
+    }
   };
   return (
     <div className="upload">

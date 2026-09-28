@@ -1,6 +1,6 @@
 # CrackAPack setup runbook
 
-Everything that needs an account or a secret. Each step says where the value goes. Secrets never go in the repo: use the GitHub, Vercel or EAS secret stores named below.
+Everything that needs an account or a secret, and where each value goes. Secrets never go in the repo, in chat, or in any file: use the GitHub or Vercel secret stores named below.
 
 Status key: **you** = needs your account or approval, **Claude** = can be done from a session once the keys exist.
 
@@ -9,108 +9,81 @@ Status key: **you** = needs your account or approval, **Claude** = can be done f
 | Step | Where |
 |---|---|
 | Merge `claude/crackapack-mobile-app-hq1y9g` into the default branch | GitHub pull request |
-| Add secret `NEON_DATABASE_URL` (Neon direct connection string, project `crackapack`) | Repo → Settings → Secrets and variables → Actions |
-| Run **mtgjson** with "Also import every card" checked | Repo → Actions → mtgjson → Run workflow |
+| Secret `NEON_DATABASE_URL`: the Neon **direct** string for the `preview` branch | Repo, Settings, Secrets and variables, Actions |
+| Secret `GMAIL_APP_PASSWORD` (step 3) | Same place |
+| Variable `MAILING_ADDRESS` (step 3) | Same place, Variables tab |
+| Run **scryfall** once (it then runs daily) | Repo, Actions, scryfall, Run workflow |
 
-After the merge, the **jobs** workflow locks queues at the cutoff and releases held buybacks every 15 minutes, and **mtgjson** refreshes prices every morning.
+The **jobs** workflow runs every 15 minutes: locks queues at 7:00 PM PT, releases held sell backs, and sends drop reminders and break ended emails. It skips quietly until `NEON_DATABASE_URL` exists.
 
-## 2. Clerk: sign in (you)
-
-| Step | Where |
-|---|---|
-| Create an application | dashboard.clerk.com |
-| Enable Email code, Google, and Apple | User & authentication → SSO connections |
-| Add the email claim: `{"email": "{{user.primary_email_address}}"}` | Sessions → Customize session token |
-| For Apple on iOS: add the app (Team ID + bundle id `com.crackapack.app`) | Native applications |
-| Copy the **publishable key** | API keys |
-| Copy the **JWT public key (PEM)** | API keys → Show JWT public key |
-
-| Value | Goes to |
-|---|---|
-| Publishable key | `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` (EAS env) and `VITE_CLERK_PUBLISHABLE_KEY` (Vercel, ops project) |
-| JWT public key (PEM) | `CLERK_JWT_KEY` (Vercel, API project) |
-| Ops site origin, e.g. `https://crackapack-ops.vercel.app` | `CLERK_AUTHORIZED_PARTIES` (Vercel, API project) |
-
-Staff: everyone signs in as a customer first. Promote staff with `POST /staff/team/role` (admin only) or, for the very first admin, in the Neon SQL editor: `select set_user_role('you@example.com', 'admin', null);`
-
-## 3. Mux: recording and clips (you)
+## 2. Stripe: credits (you)
 
 | Step | Where |
 |---|---|
-| Create an access token with Mux Video read and write | Settings → Access tokens |
-| Create one live stream, playback policy public, reconnect window 60s | Video → Live streams |
-| Put its stream key in OBS (Settings → Stream → Service: Custom, server `rtmps://global-live.mux.com:443/app`) | OBS |
-| Add a webhook to `https://<api>/webhooks/mux` | Settings → Webhooks |
+| Copy the sandbox secret key (`sk_test_...`) | Stripe dashboard, Developers, API keys |
+| Add a webhook to `https://<site>/api/webhooks/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded` | Developers, Webhooks |
 
-| Value | Goes to (Vercel, API project) |
-|---|---|
-| Token id / secret | `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET` |
-| Live stream id | `MUX_LIVE_STREAM_ID` |
-| Webhook signing secret | `MUX_WEBHOOK_SECRET` |
+Bundles are prices on product `prod_VL0BnbAdob27Ft` with lookup keys `credits_1000`, `credits_2850`, `credits_5400` (1, 3 and 6 packs on the working ladder). Code uses lookup keys, never price ids.
 
-Start the OBS stream before pressing **Start filmed session**. Clips are cut from the live recording automatically; a failed clip shows **retry** on the Notify screen.
-
-## 4. Stripe: credits (you)
-
-| Step | Where |
-|---|---|
-| Copy the sandbox secret key (`sk_test_...`) | Stripe dashboard, "Crack A Pack sandbox" → Developers → API keys |
-| Add a webhook to `https://<api>/webhooks/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded` | Developers → Webhooks |
-
-| Value | Goes to (Vercel, API project) |
+| Value | Goes to (Vercel) |
 |---|---|
 | Secret key | `STRIPE_SECRET_KEY` |
 | Webhook signing secret | `STRIPE_WEBHOOK_SECRET` |
 | `false` until live | `STRIPE_LIVEMODE` |
 
-Also apply to one high risk processor as the backup (context file section 8).
+## 3. Email: crackapack.business@gmail.com (you)
 
-## 5. Vercel: hosting (you approve, Claude deploys)
+| Step | Where |
+|---|---|
+| Turn on 2 Step Verification | myaccount.google.com, Security |
+| Create an app password named CrackAPack | myaccount.google.com, Security, App passwords |
+| Enter it yourself as `GMAIL_APP_PASSWORD` | Vercel env and the GitHub secret (step 1) |
+| Choose the mailing address for email footers (a PO box is fine) and enter it as `MAILING_ADDRESS` | Vercel env and the GitHub variable (step 1) |
 
-The connected account is on the Hobby plan, which is for non commercial use. Upgrade to **Pro** before real customers.
+Until the app password exists, emails are printed to the logs instead of sent. Gmail allows about 500 recipients a day from a personal account. Once there is a business domain, swap the `EmailProvider` in `apps/api/src/email.ts` for Resend, Postmark or SES.
 
-| Project | Root | Settings |
-|---|---|---|
-| `crackapack-api` | `apps/api` | Framework Hono. Env: `CRACKAPACK_ENV=production`, `DATABASE_URL` (Neon **pooled** string), `PG_POOL_MAX=3`, `JWT_SECRET` (random 32+ chars), plus the Clerk, Mux and Stripe values above |
-| `crackapack-ops` | `apps/staff` | Framework Vite. Build `VITE_BASE=/ vite build`. Env: `VITE_API_BASE=https://<api>`, `VITE_CLERK_PUBLISHABLE_KEY` |
+## 4. Video storage: Vercel Blob (you)
 
-The API refuses to start in production without `CLERK_JWT_KEY`, and never allows `DEV_LOGIN` or `TEST_CLOCK` there.
+| Step | Where |
+|---|---|
+| Create a Blob store (private) and connect it to `crackapack-preview` | Vercel, Storage, Create, Blob |
 
-## 5a. Private test site (Claude)
+Connecting it adds `BLOB_READ_WRITE_TOKEN`. Staff browsers upload each pack video straight to it; customers watch through links that expire after an hour. Retention is 12 months (`system_config.video_retention_months`), pending counsel.
 
-One Vercel project, `crackapack-preview`, built from this repo by `scripts/build-preview.mjs` (settings in `vercel.json`): the customer app at `/`, the staff tool at `/ops/`, the API at `/api`. Deployment protection keeps it visible only to the Vercel account owner.
+## 5. Private test site (Claude)
 
-| Env (Vercel, preview project) | Value |
+One Vercel project, `crackapack-preview`, built by `scripts/build-preview.mjs`: the customer site at `/`, the staff site at `/ops/`, the API at `/api`. Deployment protection keeps it visible only to the Vercel account owner. The build applies every migration first.
+
+| Env (Vercel) | Value |
 |---|---|
 | `DATABASE_URL` | Neon branch `preview`, **pooled** string |
 | `JWT_SECRET` | random 32+ chars |
-| `CRACKAPACK_ENV` | `preview` |
-| `DEV_LOGIN`, `TEST_CLOCK` | `1` |
+| `DOB_ENCRYPTION_KEY` | 32 random bytes, base64 |
+| `APP_URL` | `https://crackapack-preview.vercel.app` |
+| `CRACKAPACK_ENV` | `preview` (`production` refuses the pilot switches below) |
+| `DEV_LOGIN`, `TEST_CLOCK` | `1` (pilot only) |
 | `DEV_STAFF_EMAILS` | `staff@crackapack.test` |
 | `PG_POOL_MAX` | `3` |
+| `STRIPE_*`, `GMAIL_APP_PASSWORD`, `MAILING_ADDRESS`, `BLOB_READ_WRITE_TOKEN` | steps 2 to 4 |
 
-The `preview` branch gets every migration, then `packages/db/seed/preview.sql` once (a set on sale, demo cards, and `player@crackapack.test` with $100 of credit). To start over, reset the branch from its parent and apply the seed again.
+`VIDEO_DIR` (local disk video storage) is for local runs and tests only; production refuses it.
 
-Sign in to the app as `player@crackapack.test` and to `/ops/` as `staff@crackapack.test`. Before 7pm PT, **Jump to cutoff** on the Tonight screen moves the staff clock past the cutoff so a whole night can run at any hour.
+**Staff account:** sign up on the site, then promote the account in the Neon SQL editor: `select set_user_role('<email>', 'admin', null);`
 
-## 6. Expo: the app on your phone (you)
+## 6. What only you can supply
 
-| Step | Command or place |
-|---|---|
-| Create a free account | expo.dev |
-| Log in and link the project (adds the EAS project id to `app.json`) | `cd apps/mobile && npx eas-cli@latest login && npx eas-cli@latest init` |
-| Set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | `npx eas-cli@latest env:create` (or expo.dev → project → Environment variables) |
-| Android development build (free) | `npx eas-cli@latest build --profile development --platform android` |
-| iOS development build (needs an Apple Developer account, $99/year, also required for Sign in with Apple) | `npx eas-cli@latest build --profile development --platform ios` |
-
-Install the build from the link EAS prints, then check on the device: the pack tear sound and haptic, the foil shimmer following tilt, the big hit cue, and a real "You just cracked a pack" push.
+* Names and set codes of the two test sets, and each set's official pack photo URL and Wizards "What's in a pack" link (staff site, Drops, Set info).
+* Drop dates and times (staff site, Drops).
+* Confirmation of the pack ladder (1 pack 1,000 credits, 3 at 950, 6 at 900). Change it on the Stock screen.
+* The mailing address and the Gmail app password (step 3).
+* The city of the business address (Elk Grove or City of Sacramento) for the local license.
 
 ## Sell back switch
 
-Sell back is off for the test run; customers keep cards in the vault or ship them. To turn it on later (Neon SQL editor): `update system_config set buyback_enabled = true;` The app shows the Sell button as soon as it is on.
+Sell back is off for the test run; customers keep cards in the vault or ship them. To turn it on later (Neon SQL editor): `update system_config set buyback_enabled = true;` The site shows Sell back as soon as it is on.
 
 ## Before real customers (not setup, but blocking)
 
-* The California gambling law opinion on this structure (context file sections 3 and 10).
+* The counsel questions in the revision brief, section 7, starting with the California gambling law opinion.
 * Real identity verification in place of the self attested birthdate.
 * `update system_config set mode = 'live'` in Neon. This is permanent and turns off every test only path.
