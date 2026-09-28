@@ -1,10 +1,8 @@
 name: mtgjson
-# Loads MTGJSON into Neon. Prices daily; the full card catalog weekly or on demand.
+# Loads MTGJSON into Neon, on demand only. The test run uses Scryfall (scryfall.yml); MTGJSON is
+# the plan before a real launch (business context section 8).
 # Requires the repository secret NEON_DATABASE_URL (Neon direct connection string).
 on:
-  schedule:
-    - cron: "17 13 * * *"   # daily, about 6am Pacific: prices
-    - cron: "47 12 * * 1"   # Mondays, before prices: full card catalog
   workflow_dispatch:
     inputs:
       cards:
@@ -43,7 +41,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Import cards
-        if: github.event.schedule == '47 12 * * 1' || inputs.cards
+        if: inputs.cards
         run: pnpm --filter @crackapack/catalog import --printings
       - name: Import prices
         run: pnpm --filter @crackapack/catalog import --prices

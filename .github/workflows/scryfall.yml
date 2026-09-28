@@ -1,0 +1,77 @@
+name: scryfall
+# Test run card data: Scryfall's daily bulk file (every printing) into our Postgres, so search
+# and logging never call Scryfall per keystroke. Scryfall refreshes bulk data and prices daily.
+# Requires the repository secret NEON_DATABASE_URL (the database the site uses).
+on:
+  schedule:
+    - cron: "23 11 * * *"   # daily, about 4am Pacific
+  workflow_dispatch:
+    inputs:
+      fixtures:
+        description: "Only refresh the test fixtures (real printings) and commit them"
+        type: boolean
+        default: false
+jobs:
+  # Scheduled runs skip quietly until the NEON_DATABASE_URL secret exists (docs/SETUP.md step 1).
+  check:
+    if: ${{ !inputs.fixtures }}
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.secret.outputs.ready }}
+    steps:
+      - id: secret
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          if [ -n "$DATABASE_URL" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"; else
+            echo "::notice::Skipped: add the NEON_DATABASE_URL repository secret to turn this on"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "::error::Add the NEON_DATABASE_URL repository secret"; exit 1; fi
+          fi
+  import:
+    runs-on: ubuntu-latest
+    needs: check
+    if: needs.check.outputs.ready == 'true'
+    timeout-minutes: 45
+    concurrency: card-import
+    env:
+      DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @crackapack/catalog scryfall
+
+  # Real printings for the test suite (this repo's dev container cannot reach Scryfall).
+  fixtures:
+    if: ${{ inputs.fixtures }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch real printings
+        run: |
+          set -euo pipefail
+          D=packages/catalog/test/fixtures/scryfall
+          mkdir -p $D
+          UA="CrackAPack/0.1 (crackapack.business@gmail.com)"
+          get() { curl -sSf -H "User-Agent: $UA" -H "Accept: application/json" "$1"; sleep 0.6; }
+          search() { # every page of a search, as one array
+            url="https://api.scryfall.com/cards/search?unique=prints&q=$(jq -rn --arg q "$1" '$q|@uri')"; out="[]"
+            while [ -n "$url" ]; do page=$(get "$url"); out=$(jq -c --argjson p "$page" '. + $p.data' <<<"$out"); url=$(jq -r '.next_page // empty' <<<"$page"); done
+            echo "$out"
+          }
+          { search '!"Lightning Bolt"'; search '!"Delver of Secrets"'; search 'set:fdn'; } | jq -s 'add' > $D/cards.json
+          get https://api.scryfall.com/sets | jq '{data: [.data[] | {code, name, released_at, set_type, icon_svg_uri, digital}]}' > $D/sets.json
+          jq 'length' $D/cards.json
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/catalog/test/fixtures/scryfall
+          git diff --cached --quiet || git commit -m "Refresh Scryfall test fixtures (real printings)"
+          git push

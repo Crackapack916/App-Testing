@@ -15,6 +15,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const out = join(root, ".vercel/output");
 const run = (cmd, cwd, env = {}) => execSync(cmd, { cwd: join(root, cwd), stdio: "inherit", env: { ...process.env, ...env } });
 
+// On Vercel, bring the site's database up to date before shipping code that needs it.
+// Migrations are transactional and recorded in schema_migrations, so reruns are no-ops.
+if (process.env.VERCEL && process.env.DATABASE_URL) run("npx tsx scripts/migrate.ts", "packages/db");
+
 rmSync(out, { recursive: true, force: true });
 mkdirSync(join(out, "static"), { recursive: true });
 
