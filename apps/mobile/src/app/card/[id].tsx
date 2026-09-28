@@ -1,11 +1,12 @@
-import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Text } from "../../components/Text";
 import { router, useLocalSearchParams } from "expo-router";
-import { Button, LegalityTags, Screen } from "../../components/bits";
+import { Button, LegalityTags, Screen, Footer } from "../../components/bits";
 import { CardImage } from "../../components/CardImage";
 import { ResultTile, type SearchCard } from "../(tabs)/search";
 import { useApi } from "../../lib/useApi";
 import { dollars } from "../../lib/format";
-import { colors } from "../../lib/theme";
+import { colors, font } from "../../lib/theme";
 
 type Card = { id: string; name: string; set_code: string; set_name: string | null; collector_number: string; rarity: string; type_line: string | null;
   mana_cost: string | null; oracle_text: string | null; finishes: string[]; legalities: Record<string, string>;
@@ -48,17 +49,18 @@ export default function CardDetail() {
           )}
         </>}
         <Button kind="ghost" label="Close" onPress={() => (router.canGoBack() ? router.back() : router.replace("/search"))} />
+        <Footer />
       </ScrollView>
     </Screen>
   );
 }
 
 const s = StyleSheet.create({
-  name: { color: colors.text, fontSize: 22, fontWeight: "800" },
-  muted: { color: colors.muted, fontSize: 13, fontWeight: "400" },
+  name: { color: colors.text, fontSize: 22, fontFamily: font.display },
+  muted: { color: colors.muted, fontSize: 13, fontFamily: font.body },
   body: { color: colors.text, fontSize: 15, lineHeight: 22, marginTop: 6 },
   section: { color: colors.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1, marginTop: 8 },
   prices: { gap: 4 },
-  price: { color: colors.text, fontWeight: "700", textTransform: "capitalize" },
+  price: { color: colors.text, fontFamily: font.bodyBold, textTransform: "capitalize" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
 });

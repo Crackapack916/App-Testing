@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
+import { Text, TextInput } from "./Text";
 import { Button, ErrorText, Panel } from "./bits";
 import { api } from "../lib/api";
 import { useApi } from "../lib/useApi";
 import { credits, pacific } from "../lib/format";
-import { colors, radius } from "../lib/theme";
+import { colors, radius, font } from "../lib/theme";
 
 type Period = "daily" | "weekly" | "monthly";
 type Limit = { period: Period; limit: number | null; spent: number; resets_at: string; pending: { limit: number | null; at: string } | null };
@@ -144,14 +145,14 @@ function LimitRow({ lim, onBreak, reload }: { lim: Limit; onBreak: boolean; relo
 const s = StyleSheet.create({
   label: { color: colors.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1 },
   head: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
-  name: { color: colors.text, fontSize: 15, fontWeight: "700" },
+  name: { color: colors.text, fontSize: 15, fontFamily: font.bodyBold },
   value: { color: colors.text, fontSize: 15 },
   muted: { color: colors.muted, fontSize: 13, lineHeight: 18 },
   body: { color: colors.text, fontSize: 14, lineHeight: 20 },
-  link: { color: colors.accent, fontWeight: "700", fontSize: 14 },
+  link: { color: colors.accent, fontFamily: font.bodyBold, fontSize: 14 },
   row: { flexDirection: "row", gap: 12, flexWrap: "wrap", alignItems: "center" },
   chip: { borderWidth: 1, borderColor: colors.line, borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8 },
-  chipText: { color: colors.text, fontWeight: "700" },
+  chipText: { color: colors.text, fontFamily: font.bodyBold },
   track: { height: 6, backgroundColor: colors.line, borderRadius: 3, overflow: "hidden" },
   fill: { height: "100%", backgroundColor: colors.accent },
   input: { flex: 1, minWidth: 0, backgroundColor: colors.bg, color: colors.text, borderColor: colors.line, borderWidth: 1, borderRadius: radius,

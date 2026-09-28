@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Text } from "../components/Text";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAudioPlayer } from "expo-audio";
 import Animated, { Easing, FadeIn, FadeOut, ZoomIn, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -9,7 +10,7 @@ import { PackArt } from "../components/PackArt";
 import { api } from "../lib/api";
 import { dollars } from "../lib/format";
 import { haptic } from "../lib/feedback";
-import { colors, rarityColor, rarityRank } from "../lib/theme";
+import { colors, rarityColor, rarityRank, font } from "../lib/theme";
 
 type Pull = { pack_opening_id: string; order_id: string; slot: number; name: string; set_code: string; collector_number: string;
   rarity: string; finish: string; market_cents: number | null; image_url: string | null; batch_date: string };
@@ -124,7 +125,7 @@ export default function Reveal() {
           <View style={s.center} key={`${stage.pack}-${stage.index}`}>
             <Text style={s.kicker}>{stage.index + 1} / {cards.length}</Text>
             <Animated.View entering={(last ? ZoomIn.duration(520) : ZoomIn.duration(260)).easing(Easing.out(Easing.back(1.4)))}>
-              <CardImage card={card} width={last ? cardWidth : cardWidth * 0.86} glow={last || card.rarity === "rare" || card.rarity === "mythic"} />
+              <CardImage card={card} width={last ? cardWidth : cardWidth * 0.86} />
             </Animated.View>
             <Animated.View entering={FadeIn.delay(last ? 400 : 120)} style={{ alignItems: "center" }}>
               <Text style={[s.cardName, { color: rarityColor[card.rarity] === "#1B1B1B" ? colors.text : rarityColor[card.rarity] }]} testID="revealed-name">{card.name}</Text>
@@ -180,11 +181,11 @@ const s = StyleSheet.create({
   center: { alignItems: "center", justifyContent: "center", gap: 14 },
   kicker: { color: colors.muted, letterSpacing: 2, textTransform: "uppercase", fontSize: 12 },
   hint: { color: colors.muted, textAlign: "center", textTransform: "capitalize" },
-  title: { color: colors.text, fontSize: 26, fontWeight: "900", textAlign: "center" },
-  total: { color: colors.accent, fontSize: 44, fontWeight: "900" },
-  suspense: { color: colors.accent, fontSize: 64, fontWeight: "900", letterSpacing: 8 },
-  cardName: { fontSize: 22, fontWeight: "900", textAlign: "center", marginTop: 6 },
-  bigHit: { color: colors.accent, fontSize: 16, fontWeight: "900", letterSpacing: 3, textTransform: "uppercase", marginTop: 6 },
+  title: { color: colors.text, fontSize: 26, fontFamily: font.display, textAlign: "center" },
+  total: { color: colors.accent, fontSize: 44, fontFamily: font.display },
+  suspense: { color: colors.accent, fontSize: 64, fontFamily: font.display, letterSpacing: 8 },
+  cardName: { fontSize: 22, fontFamily: font.display, textAlign: "center", marginTop: 6 },
+  bigHit: { color: colors.accent, fontSize: 16, fontFamily: font.display, letterSpacing: 3, textTransform: "uppercase", marginTop: 6 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center", marginVertical: 12 },
   skip: { position: "absolute", top: 56, right: 20, padding: 8 },
 });

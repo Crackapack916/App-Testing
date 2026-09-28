@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../components/Text";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
@@ -10,7 +11,7 @@ import { api } from "../../lib/api";
 import { useApi } from "../../lib/useApi";
 import { useSession } from "../../lib/session";
 import { credits, dollars } from "../../lib/format";
-import { colors } from "../../lib/theme";
+import { colors, font } from "../../lib/theme";
 
 type Bundle = { key: string; credits: number; packs: number };
 type Order = { id: string; quantity: number; total_credits: number; status: string; product: string; batch_date: string; batch_status: string;
@@ -107,14 +108,14 @@ function statusText(o: Order) {
 }
 
 const s = StyleSheet.create({
-  h1: { color: colors.text, fontSize: 30, fontWeight: "900" },
+  h1: { color: colors.text, fontSize: 30, fontFamily: font.display },
   label: { color: colors.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1 },
-  big: { color: colors.accent, fontSize: 36, fontWeight: "900" },
+  big: { color: colors.accent, fontSize: 36, fontFamily: font.display },
   muted: { color: colors.muted, fontSize: 12 },
-  body: { color: colors.text, fontSize: 15, fontWeight: "600" },
-  section: { color: colors.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, fontSize: 12 },
+  body: { color: colors.text, fontSize: 15, fontFamily: font.bodySemi },
+  section: { color: colors.muted, fontFamily: font.bodyBold, textTransform: "uppercase", letterSpacing: 1, fontSize: 12 },
   bundles: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
   bundle: { borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 10, minWidth: 96 },
-  bundleCredits: { color: colors.text, fontWeight: "800", fontSize: 16 },
+  bundleCredits: { color: colors.text, fontFamily: font.display, fontSize: 16 },
   noteRow: { flexDirection: "row", alignItems: "center", gap: 8 },
 });

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text, TextInput } from "../components/Text";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, ErrorText, Screen } from "../components/bits";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
-import { colors, radius } from "../lib/theme";
+import { colors, radius, font } from "../lib/theme";
 
 /** Opened from the password reset email. */
 export default function ResetPassword() {
@@ -37,7 +38,7 @@ export default function ResetPassword() {
 
 const s = StyleSheet.create({
   wrap: { padding: 16, gap: 10, maxWidth: 380, width: "100%", alignSelf: "center" },
-  h1: { color: colors.text, fontSize: 20, fontWeight: "800" },
+  h1: { color: colors.text, fontSize: 20, fontFamily: font.display },
   hint: { color: colors.muted, fontSize: 12 },
   input: { minWidth: 0, backgroundColor: colors.panel, color: colors.text, borderColor: colors.line, borderWidth: 1, borderRadius: radius,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 16 },

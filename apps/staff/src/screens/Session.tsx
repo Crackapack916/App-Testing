@@ -1,3 +1,4 @@
+import { RecDot } from "../icons";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { shortId, useAction, useData, useHotkeys } from "../hooks";
@@ -48,7 +49,7 @@ export function Session({ batch, reload }: { batch: TonightData["batch"]; reload
   return (
     <div className="session">
       <div className="session-bar">
-        <span className="rec">● REC {elapsed}</span>
+        <span className="rec"><RecDot /> REC {elapsed}</span>
         <span>{session.opened} / {session.total} packs</span>
         <div className="progress"><div style={{ width: `${(100 * session.opened) / Math.max(1, session.total)}%` }} /></div>
         <span className="mono muted" title="Queue manifest hash">#{session.manifest_hash.slice(0, 12)}</span>

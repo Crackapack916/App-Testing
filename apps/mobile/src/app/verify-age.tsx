@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../components/Text";
 import { Button, ErrorText, Screen } from "../components/bits";
 import { DobFields } from "../components/DobFields";
 import { api } from "../lib/api";
 import { useSession, type Dob } from "../lib/session";
-import { colors } from "../lib/theme";
+import { colors, font } from "../lib/theme";
 
 /** For an account made before sign up asked for a date of birth. Asked once, then locked. */
 export default function VerifyAge() {
@@ -33,6 +34,6 @@ export default function VerifyAge() {
 
 const s = StyleSheet.create({
   wrap: { padding: 16, gap: 10, maxWidth: 380, width: "100%", alignSelf: "center" },
-  h1: { color: colors.text, fontSize: 20, fontWeight: "800" },
+  h1: { color: colors.text, fontSize: 20, fontFamily: font.display },
   body: { color: colors.muted, lineHeight: 20 },
 });

@@ -1,5 +1,7 @@
 import { useRef } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text, TextInput } from "./Text";
+import type { TextInput as RNTextInput } from "react-native";
 import type { Dob } from "../lib/session";
 import { colors, radius } from "../lib/theme";
 
@@ -14,7 +16,7 @@ const FIELDS = [
  * page off screen on phones). Focus moves on when a field is full.
  */
 export function DobFields({ value, onChange, onDone }: { value: Dob; onChange: (v: Dob) => void; onDone?: () => void }) {
-  const refs = [useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null)];
+  const refs = [useRef<RNTextInput>(null), useRef<RNTextInput>(null), useRef<RNTextInput>(null)];
   return (
     <View style={s.group} accessibilityRole="none">
       <Text style={s.legend} nativeID="dob-legend">Date of birth</Text>

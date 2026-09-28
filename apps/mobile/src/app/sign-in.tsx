@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text, TextInput } from "../components/Text";
 import { Link } from "expo-router";
-import { Button, ErrorText } from "../components/bits";
+import { Check } from "lucide-react-native";
+import { Button, ErrorText, Footer } from "../components/bits";
 import { DobFields } from "../components/DobFields";
 import { api } from "../lib/api";
 import { useSession, type Dob } from "../lib/session";
-import { colors, radius } from "../lib/theme";
+import { colors, radius, font } from "../lib/theme";
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -60,7 +62,7 @@ export default function SignIn() {
           <>
             <DobFields value={dob} onChange={setDob} />
             <Pressable testID="agree" onPress={() => setAgree(!agree)} style={s.check} accessibilityRole="checkbox" aria-checked={agree}>
-              <View style={[s.box, agree && s.boxOn]}>{agree && <Text style={s.tick}>✓</Text>}</View>
+              <View style={[s.box, agree && s.boxOn]}>{agree && <Check size={16} color={colors.accentInk} strokeWidth={3} />}</View>
               <Text style={s.checkText}>
                 I'm 18 or older and I agree to the <Link href="/policies/terms" style={s.link}>Terms</Link> and <Link href="/policies/privacy" style={s.link}>Privacy Policy</Link>.
               </Text>
@@ -82,6 +84,7 @@ export default function SignIn() {
           {mode !== "login" && <Pressable testID="to-login" onPress={() => go("login")}><Text style={s.link}>I have an account</Text></Pressable>}
         </View>
       </View>
+      <Footer />
     </ScrollView>
   );
 }
@@ -91,8 +94,8 @@ const s = StyleSheet.create({
   page: { flexGrow: 1, padding: 16, alignItems: "center", justifyContent: "flex-start", backgroundColor: colors.bg,
     ...(Platform.OS === "web" ? { minHeight: "100dvh" as never } : null) },
   card: { width: "100%", maxWidth: 380, gap: 10, paddingTop: 8 },
-  logo: { color: colors.text, fontSize: 22, fontWeight: "900" },
-  h1: { color: colors.text, fontSize: 20, fontWeight: "800", marginBottom: 2 },
+  logo: { color: colors.text, fontSize: 22, fontFamily: font.display },
+  h1: { color: colors.text, fontSize: 20, fontFamily: font.display, marginBottom: 2 },
   field: { gap: 4 },
   label: { color: colors.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1 },
   hint: { color: colors.muted, fontSize: 12 },
@@ -101,9 +104,9 @@ const s = StyleSheet.create({
   check: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
   box: { width: 22, height: 22, borderRadius: 4, borderWidth: 1, borderColor: colors.muted, alignItems: "center", justifyContent: "center" },
   boxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  tick: { color: colors.accentInk, fontWeight: "900" },
+  tick: { color: colors.accentInk, fontFamily: font.display },
   checkText: { flex: 1, color: colors.text, fontSize: 13, lineHeight: 18 },
   body: { color: colors.text, fontSize: 14 },
-  link: { color: colors.accent, fontWeight: "700" },
+  link: { color: colors.accent, fontFamily: font.bodyBold },
   switches: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
 });

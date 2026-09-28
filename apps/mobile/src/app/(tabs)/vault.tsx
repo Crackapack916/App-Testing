@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text, TextInput } from "../../components/Text";
 import { router } from "expo-router";
 import { SignInPrompt } from "../../components/SignInPrompt";
 import { Button, ErrorText, LegalityTags, Screen } from "../../components/bits";
@@ -9,7 +10,7 @@ import { useApi } from "../../lib/useApi";
 import { useSession } from "../../lib/session";
 import { credits, dollars } from "../../lib/format";
 import { haptic } from "../../lib/feedback";
-import { colors, radius } from "../../lib/theme";
+import { colors, radius, font } from "../../lib/theme";
 
 type Holding = { card_id: string; finish: string; condition: string; qty: number; individual_card_id: string | null; market_cents: number | null;
   name: string; set_code: string; collector_number: string; rarity: string; legalities: Record<string, string>; image_url: string | null };
@@ -211,22 +212,22 @@ function Sheet({ children, onClose }: { children: React.ReactNode; onClose: () =
 
 const s = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", padding: 16 },
-  h1: { color: colors.text, fontSize: 30, fontWeight: "900" },
-  h2: { color: colors.text, fontSize: 22, fontWeight: "800" },
-  value: { color: colors.accent, fontSize: 22, fontWeight: "900" },
+  h1: { color: colors.text, fontSize: 30, fontFamily: font.display },
+  h2: { color: colors.text, fontSize: 22, fontFamily: font.display },
+  value: { color: colors.accent, fontSize: 22, fontFamily: font.display },
   muted: { color: colors.muted, fontSize: 12 },
-  section: { color: colors.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, fontSize: 12 },
-  link: { color: colors.accent, fontWeight: "700" },
+  section: { color: colors.muted, fontFamily: font.bodyBold, textTransform: "uppercase", letterSpacing: 1, fontSize: 12 },
+  link: { color: colors.accent, fontFamily: font.bodyBold },
   pulls: { backgroundColor: colors.panel, borderColor: colors.line, borderTopWidth: 1, borderBottomWidth: 1, paddingVertical: 12, marginBottom: 8 },
   pullsHead: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 16, marginBottom: 10 },
   row: { flexDirection: "row", gap: 12, alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.line },
   rowOn: { backgroundColor: colors.panelHi },
-  name: { color: colors.text, fontWeight: "700", fontSize: 15 },
-  price: { color: colors.text, fontWeight: "800", fontSize: 15 },
+  name: { color: colors.text, fontFamily: font.bodyBold, fontSize: 15 },
+  price: { color: colors.text, fontFamily: font.display, fontSize: 15 },
   bar: { position: "absolute", left: 12, right: 12, bottom: 12, backgroundColor: colors.panel, borderRadius: radius, borderWidth: 1, borderColor: colors.accent,
     padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   body: { color: colors.text, fontSize: 15, lineHeight: 21 },
-  total: { color: colors.accent, fontSize: 26, fontWeight: "900" },
+  total: { color: colors.accent, fontSize: 26, fontFamily: font.display },
   scrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
   sheet: { backgroundColor: colors.panel, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 36, gap: 12, borderColor: colors.line, borderWidth: 1 },
   input: { backgroundColor: colors.bg, color: colors.text, borderColor: colors.line, borderWidth: 1, borderRadius: radius, padding: 12 },

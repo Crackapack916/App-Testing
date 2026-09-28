@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
 import type { Tabs } from "expo-router";
-import { colors } from "../lib/theme";
+import { colors, font } from "../lib/theme";
 import { haptic } from "../lib/feedback";
 
 type BottomTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
@@ -49,7 +50,7 @@ const s = StyleSheet.create({
   bar: { flexDirection: "row", backgroundColor: colors.panel, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 8 },
   side: { flex: 1, flexDirection: "row", justifyContent: "space-around" },
   tab: { alignItems: "center", paddingHorizontal: 8, minWidth: 64 },
-  label: { color: colors.muted, fontSize: 11, marginTop: 2, fontWeight: "600" },
+  label: { color: colors.muted, fontSize: 11, marginTop: 2, fontFamily: font.bodySemi },
   centerWrap: { alignItems: "center", marginTop: -26, paddingHorizontal: 10 },
   center: { width: 62, height: 62, borderRadius: 31, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center",
     borderWidth: 4, borderColor: colors.bg, shadowColor: colors.accent, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8 },

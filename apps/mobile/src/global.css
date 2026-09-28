@@ -1,0 +1,6 @@
+/* Web only. Colors are the palette tokens (src/lib/theme.ts). */
+html, body { background: #D9DFE9; color: #252329; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+:focus-visible { outline: 2px solid #3E5170; outline-offset: 2px; }

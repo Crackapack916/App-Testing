@@ -8,9 +8,10 @@ test("sign up at 375 by 667: three date fields, auto advance, 18+ checked on the
   await page.evaluate(() => localStorage.setItem("crackapack.testNow", "2026-10-03T15:00:00-07:00"));
   await page.getByTestId("to-signup").click();
 
-  // The whole form fits: nothing scrolls, nothing sits off the right edge.
+  // The whole form fits without scrolling: every control is on screen and nothing sits off the
+  // right edge. (The legal footer may continue below the form.)
   const fits = async () => page.evaluate(() => ({
-    v: document.scrollingElement!.scrollHeight <= innerHeight, h: document.documentElement.scrollWidth <= innerWidth,
+    v: window.scrollY === 0, h: document.documentElement.scrollWidth <= innerWidth,
     off: [...document.querySelectorAll("input, button, [role=button], [role=checkbox]")].filter((e) => {
       const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > innerWidth + 1 || r.bottom > innerHeight + 1);
     }).length }));

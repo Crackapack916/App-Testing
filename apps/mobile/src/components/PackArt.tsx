@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { colors } from "../lib/theme";
+import { colors, font } from "../lib/theme";
 
 /**
  * The pack. Shows your own photograph of the physical pack (products' pack_art_ref) when
@@ -26,7 +27,7 @@ export function PackArt({ setCode, setName, boosterType, photo, width = 110 }:
 const s = StyleSheet.create({
   pack: { borderRadius: 8, padding: 8, alignItems: "center", borderWidth: 1, borderColor: "#ffffff22" },
   crimp: { height: 8, alignSelf: "stretch", borderRadius: 2, backgroundColor: "#ffffff18", marginBottom: 10 },
-  code: { color: colors.accent, fontSize: 26, fontWeight: "900", letterSpacing: 2, marginTop: 10 },
-  name: { color: colors.text, fontSize: 12, fontWeight: "700", textAlign: "center", marginTop: 6 },
+  code: { color: colors.accent, fontSize: 26, fontFamily: font.display, letterSpacing: 2, marginTop: 10 },
+  name: { color: colors.text, fontSize: 12, fontFamily: font.bodyBold, textAlign: "center", marginTop: 6 },
   type: { color: colors.muted, fontSize: 9, letterSpacing: 1.5, marginTop: 6 },
 });

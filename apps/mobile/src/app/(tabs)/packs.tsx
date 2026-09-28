@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../components/Text";
 import { Button, ErrorText, Panel, Screen } from "../../components/bits";
 import { PackArt } from "../../components/PackArt";
 import { CardImage } from "../../components/CardImage";
@@ -8,7 +9,7 @@ import { useApi } from "../../lib/useApi";
 import { useSession } from "../../lib/session";
 import { credits, countdown, dollars } from "../../lib/format";
 import { haptic } from "../../lib/feedback";
-import { colors, radius } from "../../lib/theme";
+import { colors, radius, font } from "../../lib/theme";
 
 type Tier = { min_qty: number; per_pack_credits: number };
 type Product = { product_id: string; set_code: string; set_name: string; booster_type: string; name: string;
@@ -159,28 +160,28 @@ function useNow(ms: number) {
 
 const s = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", padding: 16 },
-  h1: { color: colors.text, fontSize: 30, fontWeight: "900" },
-  h2: { color: colors.text, fontSize: 22, fontWeight: "800" },
+  h1: { color: colors.text, fontSize: 30, fontFamily: font.display },
+  h2: { color: colors.text, fontSize: 22, fontFamily: font.display },
   sub: { color: colors.muted, marginTop: 2, maxWidth: 240 },
   balance: { alignItems: "flex-end" },
-  balanceNum: { color: colors.accent, fontSize: 22, fontWeight: "900" },
+  balanceNum: { color: colors.accent, fontSize: 22, fontFamily: font.display },
   balanceLabel: { color: colors.muted, fontSize: 11 },
-  section: { color: colors.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, fontSize: 12, paddingHorizontal: 16, marginBottom: 8 },
+  section: { color: colors.muted, fontFamily: font.bodyBold, textTransform: "uppercase", letterSpacing: 1, fontSize: 12, paddingHorizontal: 16, marginBottom: 8 },
   product: { flexDirection: "row", gap: 14, alignItems: "center" },
-  pname: { color: colors.text, fontSize: 18, fontWeight: "800" },
-  price: { color: colors.accent, fontSize: 16, fontWeight: "800" },
-  muted: { color: colors.muted, fontWeight: "400", fontSize: 13 },
-  stock: { color: colors.ok, fontSize: 12, fontWeight: "600" },
+  pname: { color: colors.text, fontSize: 18, fontFamily: font.display },
+  price: { color: colors.accent, fontSize: 16, fontFamily: font.display },
+  muted: { color: colors.muted, fontFamily: font.body, fontSize: 13 },
+  stock: { color: colors.ok, fontSize: 12, fontFamily: font.bodySemi },
   how: { color: colors.muted, fontSize: 12, lineHeight: 18, padding: 16, marginTop: 8 },
   scrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
   sheet: { backgroundColor: colors.panel, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 36, borderColor: colors.line, borderWidth: 1 },
   qtyRow: { flexDirection: "row", gap: 8 },
   qty: { flex: 1, borderRadius: radius, borderWidth: 1, borderColor: colors.line, paddingVertical: 10, alignItems: "center" },
   qtyOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  qtyNum: { color: colors.text, fontSize: 20, fontWeight: "900" },
+  qtyNum: { color: colors.text, fontSize: 20, fontFamily: font.display },
   qtyEach: { color: colors.muted, fontSize: 11 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  total: { color: colors.text, fontSize: 20, fontWeight: "900" },
+  total: { color: colors.text, fontSize: 20, fontFamily: font.display },
   body: { color: colors.text, fontSize: 15, lineHeight: 21 },
   warn: { color: colors.accent },
   fine: { color: colors.muted, fontSize: 12 },

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { FlatList, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Text, TextInput } from "../../components/Text";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { Screen } from "../../components/bits";
+import { Screen, Footer } from "../../components/bits";
 import { CardImage } from "../../components/CardImage";
 import { api } from "../../lib/api";
 import { dollars } from "../../lib/format";
-import { colors, radius } from "../../lib/theme";
+import { colors, radius, font } from "../../lib/theme";
 
 export type SearchCard = { id: string; name: string; set_code: string; set_name: string | null; set_icon: string | null;
   collector_number: string; rarity: string; finishes: string[]; type_line: string | null;
@@ -118,6 +119,7 @@ export default function Search() {
         contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 120, maxWidth: 1200, width: "100%", alignSelf: "center" }}
         ListEmptyComponent={<Text style={s.hint}>{!query.has("q") && !active ? "Search every printing. Prices are market prices and update daily." : loading ? "Searching…" : "No cards found."}</Text>}
         renderItem={({ item }) => <ResultTile card={item} width={cardW} />}
+        ListFooterComponent={<Footer />}
       />
     </Screen>
   );
@@ -156,22 +158,22 @@ function ChipRow({ label, items, value, onPick }: { label: string; items: [strin
 
 const s = StyleSheet.create({
   head: { paddingHorizontal: 16, paddingTop: 16, gap: 10, maxWidth: 1200, width: "100%", alignSelf: "center" },
-  h1: { color: colors.text, fontSize: 28, fontWeight: "900" },
+  h1: { color: colors.text, fontSize: 28, fontFamily: font.display },
   input: { backgroundColor: colors.panel, color: colors.text, borderColor: colors.line, borderWidth: 1, borderRadius: radius, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
   row: { flexDirection: "row", gap: 8, alignItems: "center" },
   chip: { borderWidth: 1, borderColor: colors.line, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6 },
   chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  chipText: { color: colors.text, fontSize: 13, fontWeight: "600", textTransform: "capitalize" },
+  chipText: { color: colors.text, fontSize: 13, fontFamily: font.bodySemi, textTransform: "capitalize" },
   chipTextOn: { color: colors.accentInk },
   filters: { gap: 8, paddingVertical: 4 },
   label: { color: colors.muted, fontSize: 12, width: 56 },
   small: { minWidth: 0, backgroundColor: colors.panel, color: colors.text, borderColor: colors.line, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14 },
-  link: { color: colors.accent, fontWeight: "700" },
-  name: { color: colors.text, fontWeight: "700", fontSize: 14 },
+  link: { color: colors.accent, fontFamily: font.bodyBold },
+  name: { color: colors.text, fontFamily: font.bodyBold, fontSize: 14 },
   meta: { flexDirection: "row", gap: 4, alignItems: "center" },
   icon: { width: 14, height: 14 },
   muted: { color: colors.muted, fontSize: 12 },
-  price: { color: colors.text, fontWeight: "800", fontSize: 14 },
+  price: { color: colors.text, fontFamily: font.display, fontSize: 14 },
   hint: { color: colors.muted, padding: 16, textAlign: "center" },
   error: { color: colors.danger },
 });
