@@ -1,17 +1,14 @@
 /**
- * Card image adapter. Images load from Scryfall's image CDN in the customer's browser or
- * app; we never copy, store or proxy them. Swap this one function to change the source.
+ * Card images load from Scryfall's CDN in the customer's browser; we never copy, store or
+ * proxy them. Links come only from the image_uris Scryfall returned (card_images); nothing
+ * builds an image URL by hand.
  */
-export function cardImageUrl(scryfallId: string | null | undefined, size: "small" | "normal" | "large" = "normal") {
-  if (!scryfallId) return null;
-  return `https://cards.scryfall.io/${size}/front/${scryfallId[0]}/${scryfallId[1]}/${scryfallId}.jpg`;
+type Uris = Record<string, string> | null | undefined;
+
+/** Replaces image_uris with image_url (normal) and image_small, as Scryfall gave them. */
+export function withImages<T extends { image_uris?: Uris }>(rows: T[]) {
+  return rows.map(({ image_uris, ...r }) => ({ ...r, image_url: image_uris?.normal ?? null, image_small: image_uris?.small ?? null }));
 }
 
-/** Adds image_url to rows that carry a scryfall_id, and drops the vendor id from the response. */
-export function withImages<T extends { scryfall_id?: string | null }>(rows: T[]) {
-  return rows.map(({ scryfall_id, ...r }) => ({ ...r, image_url: cardImageUrl(scryfall_id) }));
-}
-
-/** SQL fragment: the Scryfall id for card alias `cd`. */
-export const SCRYFALL_ID_SQL =
-  "(select external_id from card_external_ids e where e.card_id = cd.id and e.source = 'scryfall') as scryfall_id";
+/** SQL fragment: the stored image links for card alias `cd`. */
+export const IMAGE_SQL = "(select uris from card_images ci where ci.card_id = cd.id) as image_uris";

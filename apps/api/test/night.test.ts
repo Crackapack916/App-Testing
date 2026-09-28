@@ -160,17 +160,8 @@ describe("catalog and products", () => {
     expect(store[0].ladder.map((t: any) => t.per_pack_credits)).toEqual([900, 850, 825, 800, 775]);
   });
 
-  it("searches cards with images and legality, and lists big pulls without names or prices", async () => {
-    const bolt = await makeCard(db, { set: "FDN", num: "1", rarity: "common", priceCents: 125 });
-    await db.q("update cards set name = 'Lightning Bolt', legalities = '{\"modern\":\"Legal\"}' where id = $1", [bolt]);
-    await db.q("insert into card_external_ids values ('scryfall', 'abcdef12-0000', $1)", [bolt]);
-    const r = (await call("GET", "/cards/search?q=bolt")).body.cards;
-    expect(r[0]).toMatchObject({ name: "Lightning Bolt", legalities: { modern: "Legal" }, prices: { nonfoil: 125 },
-      image_url: "https://cards.scryfall.io/normal/front/a/b/abcdef12-0000.jpg" });
-    expect(r[0].scryfall_id).toBeUndefined();
-    expect((await call("GET", `/cards/${bolt}`)).body.card.name).toBe("Lightning Bolt");
-    expect((await call("GET", "/cards/search?q=b")).body.cards).toEqual([]);
-    expect((await call("GET", "/feed/big-pulls")).body.pulls).toEqual([]);
+  it("has no big pulls feed (the site never advertises pulls)", async () => {
+    expect((await app.request("/feed/big-pulls")).status).toBe(404);
   });
 });
 
@@ -289,9 +280,5 @@ describe("a full night over the API", () => {
     // The whole night is on the custody chain.
     expect((await db.one("select verify_custody_chain() as b")).b).toBeNull();
 
-    // The mythic shows in the public feed with no customer name and no price.
-    const feed = (await call("GET", "/feed/big-pulls", { at: DURING(9) })).body.pulls;
-    expect(feed.map((f: any) => f.name)).toEqual(["Card 101"]);
-    for (const k of ["customer", "display_name", "email", "user_id", "prices", "market_cents"]) expect(feed[0]).not.toHaveProperty(k);
   });
 });

@@ -60,12 +60,13 @@ jobs:
           mkdir -p $D
           UA="CrackAPack/0.1 (crackapack.business@gmail.com)"
           get() { curl -sSf -H "User-Agent: $UA" -H "Accept: application/json" "$1"; sleep 0.6; }
-          search() { # every page of a search, as one array
-            url="https://api.scryfall.com/cards/search?unique=prints&q=$(jq -rn --arg q "$1" '$q|@uri')"; out="[]"
-            while [ -n "$url" ]; do page=$(get "$url"); out=$(jq -c --argjson p "$page" '. + $p.data' <<<"$out"); url=$(jq -r '.next_page // empty' <<<"$page"); done
-            echo "$out"
+          T=$(mktemp -d); n=0
+          search() { # every page of a search, saved as files
+            url="https://api.scryfall.com/cards/search?unique=prints&q=$(jq -rn --arg q "$1" '$q|@uri')"
+            while [ -n "$url" ]; do n=$((n+1)); get "$url" > "$T/p$n.json"; url=$(jq -r '.next_page // empty' "$T/p$n.json"); done
           }
-          { search '!"Lightning Bolt"'; search '!"Delver of Secrets"'; search 'set:fdn'; } | jq -s 'add' > $D/cards.json
+          search '!"Lightning Bolt"'; search '!"Delver of Secrets"'; search 'set:fdn'
+          jq -s '[.[].data[]]' "$T"/p*.json > $D/cards.json
           get https://api.scryfall.com/sets | jq '{data: [.data[] | {code, name, released_at, set_type, icon_svg_uri, digital}]}' > $D/sets.json
           jq 'length' $D/cards.json
       - name: Commit

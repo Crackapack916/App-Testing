@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { BUNDLES } from "@crackapack/payments";
 import { requireUser } from "../auth";
 import { ApiError } from "../errors";
-import { SCRYFALL_ID_SQL, withImages } from "../images";
+import { IMAGE_SQL, withImages } from "../images";
 import type { Env } from "../context";
 
 /** Customer facing routes. Every write goes through a database function. */
@@ -132,7 +132,7 @@ customer.get("/orders", async (c) => {
 customer.get("/me/vault", async (c) => {
   const { rows } = await c.get("db").query(
     `select h.card_id, h.finish, h.condition, h.qty, h.individual_card_id, h.market_cents::int, h.price_asof,
-            cd.name, cd.set_code, cd.collector_number, cd.rarity, cd.legalities, ${SCRYFALL_ID_SQL}
+            cd.name, cd.set_code, cd.collector_number, cd.rarity, cd.legalities, ${IMAGE_SQL}
      from vault_holdings h join cards cd on cd.id = h.card_id
      where h.user_id = $1 order by h.market_cents desc nulls last, cd.name`, [c.get("user").id]);
   const total = rows.reduce((s, r) => s + (r.market_cents ?? 0) * r.qty, 0);
@@ -146,7 +146,7 @@ customer.get("/me/pulls", async (c) => {
        select o.batch_id from orders o where o.user_id = $1 and o.status = 'fulfilled'
        order by o.fulfilled_at desc limit 1)
      select po.id as pack_opening_id, q.order_id, q.pack_index, pc.slot, pc.finish, pc.individual_card_id,
-            cd.name, cd.set_code, cd.collector_number, cd.rarity, pr.market_cents::int, b.batch_date::text, ${SCRYFALL_ID_SQL}
+            cd.name, cd.set_code, cd.collector_number, cd.rarity, pr.market_cents::int, b.batch_date::text, ${IMAGE_SQL}
      from last_night ln
      join batches b on b.id = ln.batch_id
      join queue_entries q on q.batch_id = ln.batch_id and q.user_id = $1

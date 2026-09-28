@@ -80,6 +80,7 @@ const CODES: Record<string, [number, string]> = {
   unknown_set: [404, "That set isn't in the card database yet. Run the MTGJSON import."],
   unknown_product: [404, "Product not found."],
   unknown_card: [404, "Card not found."],
+  invalid_filter: [400, "That filter isn't available."],
   ladder_empty: [400, "Add at least one price tier."],
   ladder_must_start_at_one: [400, "The price ladder must start at 1 pack."],
   ladder_not_decreasing: [400, "Bigger orders can't cost more per pack."],
