@@ -11,6 +11,7 @@ import { Ship } from "./screens/Ship";
 
 export type TonightData = {
   now: string;
+  test_clock: boolean;
   batch: null | {
     id: string; batch_date: string; cutoff_at: string; status: string; manifest_hash: string | null;
     entry_count: number | null; session_id: string | null;

@@ -71,10 +71,28 @@ The connected account is on the Hobby plan, which is for non commercial use. Upg
 
 | Project | Root | Settings |
 |---|---|---|
-| `crackapack-api` | `apps/api` | Framework Hono. Env: `NODE_ENV=production`, `DATABASE_URL` (Neon **pooled** string), `PG_POOL_MAX=3`, `JWT_SECRET` (random 32+ chars), plus the Clerk, Mux and Stripe values above |
+| `crackapack-api` | `apps/api` | Framework Hono. Env: `CRACKAPACK_ENV=production`, `DATABASE_URL` (Neon **pooled** string), `PG_POOL_MAX=3`, `JWT_SECRET` (random 32+ chars), plus the Clerk, Mux and Stripe values above |
 | `crackapack-ops` | `apps/staff` | Framework Vite. Build `VITE_BASE=/ vite build`. Env: `VITE_API_BASE=https://<api>`, `VITE_CLERK_PUBLISHABLE_KEY` |
 
 The API refuses to start in production without `CLERK_JWT_KEY`, and never allows `DEV_LOGIN` or `TEST_CLOCK` there.
+
+## 5a. Private test site (Claude)
+
+One Vercel project, `crackapack-preview`, built from this repo by `scripts/build-preview.mjs` (settings in `vercel.json`): the customer app at `/`, the staff tool at `/ops/`, the API at `/api`. Deployment protection keeps it visible only to the Vercel account owner.
+
+| Env (Vercel, preview project) | Value |
+|---|---|
+| `DATABASE_URL` | Neon branch `preview`, **pooled** string |
+| `JWT_SECRET` | random 32+ chars |
+| `CRACKAPACK_ENV` | `preview` |
+| `DEV_LOGIN`, `TEST_CLOCK` | `1` |
+| `DEV_STAFF_EMAILS` | `staff@crackapack.test` |
+| `PUSH` | `log` |
+| `PG_POOL_MAX` | `3` |
+
+The `preview` branch gets every migration, then `packages/db/seed/preview.sql` once (a set on sale, demo cards, and `player@crackapack.test` with $100 of credit). To start over, reset the branch from its parent and apply the seed again.
+
+Sign in to the app as `player@crackapack.test` and to `/ops/` as `staff@crackapack.test`. Before 7pm PT, **Jump to cutoff** on the Tonight screen moves the staff clock past the cutoff so a whole night can run at any hour.
 
 ## 6. Expo: the app on your phone (you)
 

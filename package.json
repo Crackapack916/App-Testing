@@ -5,6 +5,10 @@
   "scripts": {
     "db:local": "bash packages/db/scripts/local-pg.sh",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r exec tsc --noEmit -p ."
+    "typecheck": "pnpm -r exec tsc --noEmit -p .",
+    "build:preview": "node scripts/build-preview.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }

@@ -184,6 +184,8 @@ describe("a full night over the API", () => {
     // Tonight, before and after locking.
     let tonight = await call("GET", "/staff/tonight", { token: staff.token, at: AFTER });
     expect(tonight.body.batch.status).toBe("open");
+    // A test mode database with TEST_CLOCK on: the staff tool may offer "Jump to cutoff".
+    expect(tonight.body.test_clock).toBe(true);
     expect(tonight.body.queue.map((q: any) => q.customer)).toEqual(["alice", "alice", "bob"]);
     const batchId = tonight.body.batch.id;
     expect((await call("POST", `/staff/batches/${batchId}/lock`, { token: staff.token, at: BEFORE })).body.error).toBe("cutoff_not_reached");

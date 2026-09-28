@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "../api";
+import { api, testClock } from "../api";
 import { shortId, useAction } from "../hooks";
 import type { TonightData } from "../App";
 
@@ -9,6 +9,10 @@ export function Tonight({ data, reload, goSession }: { data: TonightData | null;
   const { busy, error, run } = useAction();
   if (!data) return <p className="muted">Loading…</p>;
   const { batch, queue, stock, upcoming } = data;
+
+  // Test sites only: move the staff clock just past the cutoff to run a night at any hour.
+  const jump = () => { testClock.jumpTo(new Date(Date.parse(upcoming.cutoff_at) + 60_000).toISOString()); reload(); };
+  const realTime = () => { testClock.reset(); reload(); };
 
   const lock = () => run(async () => { await api("POST", `/staff/batches/${batch!.id}/lock`); reload(); });
   const start = () => run(async () => {
@@ -28,7 +32,19 @@ export function Tonight({ data, reload, goSession }: { data: TonightData | null;
           <p className="muted">
             Next cutoff {new Date(upcoming.cutoff_at).toLocaleString()} · {upcoming.packs} packs ordered so far for {upcoming.batch_date}
           </p>
+          {data.test_clock && (
+            <div className="action">
+              <p className="muted">Test mode: run tonight now instead of waiting for the cutoff. Orders close for this night.</p>
+              <button className="primary" onClick={jump} data-testid="jump-cutoff">Jump to cutoff</button>
+            </div>
+          )}
         </section>
+      )}
+
+      {data.test_clock && testClock.offset() !== 0 && (
+        <p className="muted">
+          Test clock: {new Date(data.now).toLocaleString()} <button className="link" onClick={realTime}>back to real time</button>
+        </p>
       )}
 
       {batch && (

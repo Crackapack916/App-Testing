@@ -9,3 +9,4 @@ test-results/
 playwright-report/
 apps/mobile/dist/
 .expo/
+.vercel/

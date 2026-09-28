@@ -34,13 +34,15 @@ staff.get("/tonight", async (c) => {
     `select b.id, b.batch_date::text, b.cutoff_at,
             (select count(*) from queue_entries q where q.batch_id = b.id and q.status = 'queued')::int as packs
      from batch_for_time(app_now()) b`);
-  const { rows: [clock] } = await db.query("select app_now() as now");
+  const { rows: [clock] } = await db.query("select app_now() as now, mode = 'test' as test_mode from system_config");
   const queue = batch ? await queueOf(db, batch.id) : [];
   const { rows: stock } = await db.query(
     `select p.id as product_id, p.name, s.packs_on_hand, s.packs_reserved, p.safety_buffer_packs,
             (select count(*) from sealed_boxes x where x.product_id = p.id and x.status = 'sealed')::int as sealed_boxes
      from products p join product_stock s on s.product_id = p.id order by p.name`);
-  return c.json({ now: clock.now, batch: batch ?? null, upcoming, queue, stock });
+  // test_clock: the staff tool may offer to run the night early (X-Test-Now). Never on a live database.
+  const test_clock = !!c.get("services").testClock && clock.test_mode;
+  return c.json({ now: clock.now, test_clock, batch: batch ?? null, upcoming, queue, stock });
 });
 
 async function queueOf(db: pg.PoolClient, batchId: string) {

@@ -14,12 +14,14 @@ export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
 
   // Pilot conveniences must never reach a production server: dev login signs anyone in
   // as any email, and the test clock would let a customer order after the cutoff.
-  if (env.NODE_ENV === "production" && (env.DEV_LOGIN === "1" || env.TEST_CLOCK === "1")) {
-    throw new Error("DEV_LOGIN and TEST_CLOCK are not allowed when NODE_ENV=production");
+  // CRACKAPACK_ENV, not NODE_ENV: Vercel sets NODE_ENV=production on every deploy, previews included.
+  const production = env.CRACKAPACK_ENV === "production";
+  if (production && (env.DEV_LOGIN === "1" || env.TEST_CLOCK === "1")) {
+    throw new Error("DEV_LOGIN and TEST_CLOCK are not allowed when CRACKAPACK_ENV=production");
   }
 
   // Production signs in only through Clerk.
-  if (env.NODE_ENV === "production" && !env.CLERK_JWT_KEY) throw new Error("CLERK_JWT_KEY is required when NODE_ENV=production");
+  if (production && !env.CLERK_JWT_KEY) throw new Error("CLERK_JWT_KEY is required when CRACKAPACK_ENV=production");
 
   // Serverless instances should each hold only a few connections (PG_POOL_MAX=3 on Vercel).
   const pool = new pg.Pool({ connectionString: required("DATABASE_URL"), max: Number(env.PG_POOL_MAX ?? 10) });
