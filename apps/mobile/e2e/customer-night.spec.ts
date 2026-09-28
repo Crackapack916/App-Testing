@@ -35,62 +35,76 @@ async function runNight(request: APIRequestContext) {
     }
     await call("post", `/staff/packs/${pack.id}/finalize`, at(8));
   }
-  expect((await call("post", `/staff/batches/${batch.id}/notify`, at(9))).notified).toBe(1);
+  // One video per pack, straight to storage, then approve and notify.
+  const bytes = Buffer.alloc(4096, 7);
+  for (const pack of packs) {
+    await call("post", `/staff/packs/${pack.id}/video/start`, at(9));
+    const pathname = `packs/${pack.id}.mp4`;
+    const put = await request.put(`${API}/staff/videos/local/${pathname}`, { headers: { authorization: `Bearer ${staff.token}`, "content-type": "video/mp4" }, data: bytes });
+    expect(put.ok()).toBeTruthy();
+    await call("post", `/staff/packs/${pack.id}/video/finish`, at(9), { pathname, size: bytes.length, sha256: "ab".repeat(32), duration_ms: 60_000, content_type: "video/mp4" });
+  }
+  expect((await call("post", `/staff/batches/${batch.id}/approve`, at(10))).notified).toBe(1);
 }
 
-test("a customer's night: order, get cracked, reveal, vault, ship, search", async ({ page, request }) => {
+test("a customer's night: order, get cracked, watch, vault, ship, search", async ({ page, request }) => {
   await page.goto("/sign-in");
   await setNow(page, BEFORE);
   await page.getByTestId("email").fill("alice@e2e.test");
   await page.getByTestId("password").fill("alice password");
   await page.getByTestId("submit").click();
 
-  // Packs is the landing tab: tonight's cutoff, the balance, the set on sale.
-  await expect(page.getByTestId("cutoff")).toContainText("Tonight's queue locks in 4h 0m");
+  // Packs is the landing tab: the carousel, the set's limit, tonight's cutoff on server time, the balance.
+  await expect(page.getByTestId("cutoff")).toContainText("Order by 7:00 PM PT to be in tonight's rip. 4h 0m");
   await expect(page.getByTestId("balance")).toHaveText("5,000");
-  await expect(page.getByTestId("product-FDN")).toContainText("900 credits");
+  await expect(page.getByTestId("product-FDN")).toContainText("900 credits a pack");
+  await expect(page.getByTestId("set-limit")).toHaveText("You have 6 of 6 available for Foundations.");
   await shot(page, "m1-packs");
 
-  // Order 3 packs: the ladder prices them at $8.50 each. Ordering queues, it doesn't rip.
-  await page.getByTestId("product-FDN").click();
+  // Three packs at the 3 pack price. A first order suggests a spending limit, gently.
   await page.getByTestId("qty-3").click();
+  await expect(page.getByTestId("buy")).toHaveText(/Buy 3 · 2,550 credits/i);
+  await page.getByTestId("buy").click();
+  await expect(page.getByTestId("limit-prompt")).toBeVisible();
+  await page.getByTestId("limit-not-now").click();
   await expect(page.getByTestId("total")).toHaveText("2,550 credits");
   await shot(page, "m2-order");
   await page.getByTestId("place-order").click();
   await expect(page.getByTestId("placed")).toContainText("still sealed");
   await page.getByRole("button", { name: "Done" }).click();
   await expect(page.getByTestId("balance")).toHaveText("2,450");
+  await expect(page.getByTestId("set-limit")).toHaveText("You have 3 of 6 available for Foundations.");
 
-  // Account shows it sealed in tonight's queue.
+  // Account: the credits activity and the order, sealed in tonight's queue.
   await page.getByTestId("tab-account").click();
+  await expect(page.getByTestId("account-credits")).toHaveText("2,450 credits");
+  await expect(page.getByTestId("activity-row").first()).toContainText("Bought 3 packs Foundations");
   await expect(page.getByTestId("order-queued")).toContainText("sealed, in tonight's queue");
 
-  // Tonight happens.
+  // Tonight happens. The Vault tab gets its dot.
   await runNight(request);
   await setNow(page, "2026-10-01T20:30:00-07:00");
+  await page.getByTestId("tab-search").click();
+  await expect(page.getByTestId("vault-dot")).toBeVisible();
 
-  // The notification opens the reveal: tap to crack, cards one at a time, the mythic last.
-  await page.goto("/account");
-  await page.getByRole("button", { name: "Reveal" }).click();
-  await expect(page.getByTestId("tap-to-crack")).toBeVisible();
-  await page.getByTestId("reveal").click();                     // crack pack 1
-  await expect(page.getByTestId("revealed-name")).toBeVisible();
-  await expect(page.getByTestId("big-hit")).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByTestId("revealed-name")).toHaveText("Sheoldred, the Apocalypse");
-  await shot(page, "m3-reveal-hit");
-  await page.getByTestId("skip").click();
-  await expect(page.getByTestId("reveal-done")).toContainText("You cracked 3 packs");
-  await shot(page, "m4-reveal-done");
-  await page.getByTestId("to-vault").click();
-
-  // Vault: today's pulls on top, the mythic held individually, live value.
-  await expect(page.getByTestId("todays-pulls")).toContainText("Today's pulls · 2026-10-01");
-  await expect(page.getByTestId("holding-FDN-101")).toContainText("held individually");
+  // Vault: Cracked today with New marks, then the dot clears.
+  await page.getByTestId("tab-vault").click();
+  await expect(page.getByTestId("cracked-today")).toContainText("Foundations");
+  await expect(page.getByTestId("new-banner")).toBeVisible();
+  await expect(page.getByTestId("vault-dot")).toHaveCount(0);
   await expect(page.getByTestId("vault-value")).toHaveText("$63.90");
-  await shot(page, "m5-vault");
+  await shot(page, "m3-vault");
 
-  // Sell back is off for the test run: keep it in the vault or ship it.
+  // Watch a pack: its video, and its cards in the order they came out.
+  await page.locator("[data-testid^=watch-]").first().click();
+  await expect(page.getByTestId("pack-video").locator("video")).toHaveAttribute("src", /\/videos\/local\/packs\/.+\.mp4\?exp=\d+&sig=[0-9a-f]{64}/);
+  await expect(page.getByTestId("pack-card-3")).toBeVisible();
+  await shot(page, "m4-pack");
+  await page.getByRole("button", { name: "Close" }).click();
+
+  // Sell back is off for the test run: keep cards in the vault or ship them.
   // Ship the commons: 5 x $3.50 = $17.50, under $50, so 499 credits shipping.
+  await page.getByTestId("select-mode").click();
   await page.getByTestId("holding-FDN-7").click();
   await expect(page.getByTestId("sell")).toHaveCount(0);
   await page.getByTestId("ship").click();
@@ -101,8 +115,8 @@ test("a customer's night: order, get cracked, reveal, vault, ship, search", asyn
   await page.getByTestId("addr-zip").fill("95814");
   await page.getByTestId("request-shipment").click();
   await expect(page.getByText("Shipping requested")).toBeVisible();
-  await expect(page.getByText("499 credits shipping.")).toBeVisible();
-  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByText("499 credits for shipping.")).toBeVisible();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
   await expect(page.getByTestId("holding-FDN-7")).toHaveCount(0);
 
   // Search: legality and prices from the catalog.

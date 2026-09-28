@@ -18,7 +18,7 @@ type SessionData = {
  * The on camera screen. One key does the next thing:
  *   Space  open the next pack (paired by the server, never chosen here)
  *   B      open the next sealed box on camera when the product has no open box
- *   V      void a damaged pack
+ *   V      replace a damaged pack (set it aside on camera; the next sealed pack takes its place)
  */
 export function Session({ batch, reload }: { batch: TonightData["batch"]; reload: () => void }) {
   const sessionId = batch?.session_id ?? null;
@@ -73,7 +73,7 @@ export function Session({ batch, reload }: { batch: TonightData["batch"]; reload
             {needsBox
               ? <button className="primary huge" disabled={busy || !next.sealed_boxes[0]} onClick={openBox} data-testid="open-box">Open box <kbd>B</kbd></button>
               : <button className="primary huge" disabled={busy} onClick={openPack} data-testid="open-pack">Crack pack <kbd>Space</kbd></button>}
-            <button className="ghost" disabled={!next.open_box} onClick={() => setVoiding(true)}>Void damaged pack <kbd>V</kbd></button>
+            <button className="ghost" disabled={!next.open_box} onClick={() => setVoiding(true)}>Replace damaged pack <kbd>V</kbd></button>
           </div>
         </section>
       ) : (
@@ -86,12 +86,13 @@ export function Session({ batch, reload }: { batch: TonightData["batch"]; reload
       {voiding && (
         <div className="modal">
           <div className="panel">
-            <h2>Void the next pack from {next?.open_box?.label}</h2>
+            <h2>Replace a damaged pack from {next?.open_box?.label}</h2>
+            <p className="muted">Hold the damaged pack up to the camera and set it aside. The next sealed pack takes its place in the queue. The reason is logged.</p>
             <p className="muted">The pack is consumed on camera. Position #{next?.position} gets the following pack.</p>
             <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (torn wrapper, crushed…)"
               onKeyDown={(e) => { if (e.key === "Enter" && reason.trim()) voidPack(); if (e.key === "Escape") setVoiding(false); }} />
             <div className="row"><button className="ghost" onClick={() => setVoiding(false)}>Cancel</button>
-              <button className="danger" disabled={!reason.trim() || busy} onClick={voidPack}>Void pack</button></div>
+              <button className="danger" disabled={!reason.trim() || busy} onClick={voidPack}>Set aside and replace</button></div>
           </div>
         </div>
       )}

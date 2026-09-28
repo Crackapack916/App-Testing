@@ -334,7 +334,7 @@ staff.get("/batches/:id/overview", async (c) => {
   });
   const { rows: [m] } = await c.get("db").query("select pathname, size_bytes, sha256, uploaded_at from session_masters where batch_id = $1", [c.req.param("id")]);
   const ready = packs.length > 0 && packs.every((r) => r.pack_id && ["ready", "approved"].includes(r.video_status) && r.approved_at);
-  return c.json({ packs, session_master: m ?? null, ready_to_approve: ready, videos_enabled: !!c.get("services").videos });
+  return c.json({ packs, session_master: m ?? null, ready_to_approve: ready, videos_kind: c.get("services").videos?.kind ?? null });
 });
 
 // The browser asks for a one upload token, then sends the file straight to storage.
@@ -492,7 +492,7 @@ staff.post("/team/role", requireUser("admin"), async (c) => {
 
 staff.get("/products", async (c) => {
   const { rows } = await c.get("db").query(
-    `select p.*, s.name as set_name, st.packs_on_hand, st.packs_reserved,
+    `select p.*, s.name as set_name, s.wizards_info_url, s.pack_image_url, st.packs_on_hand, st.packs_reserved,
             (select count(*) from sealed_boxes x where x.product_id = p.id and x.status = 'sealed')::int as sealed_boxes,
             (select json_agg(json_build_object('min_qty', t.min_qty, 'per_pack_credits', t.per_pack_credits) order by t.min_qty)
              from price_tiers t where t.product_id = p.id) as ladder

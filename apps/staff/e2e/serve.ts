@@ -1,3 +1,6 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 /**
  * Starts the API for end to end tests: a fresh database cloned from the migrated
  * template, seeded with a night's orders placed before the 7pm cutoff, serving the
@@ -48,6 +51,7 @@ const child = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {
     TEST_CLOCK: "1",
     DEV_STAFF_EMAILS: "ops@e2e.test",
     STAFF_DIST: resolve("dist"),
+    VIDEO_DIR: mkdtempSync(join(tmpdir(), "e2e-videos-")),
     PORT: process.env.E2E_PORT ?? "8788",
   },
 });

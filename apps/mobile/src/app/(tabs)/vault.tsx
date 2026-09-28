@@ -114,7 +114,7 @@ function VaultScreen() {
                 {packs.some((p) => p.is_new) && <View style={s.newBanner} testID="new-banner"><Text style={s.newText}>New</Text></View>}
               </View>
               <Carousel label="Cracked today" items={packs} keyOf={(p) => p.pack_id} labelOf={(p) => `${p.set_name}, pack ${p.pack_index} of ${p.order_packs}`}
-                itemWidth={Math.min(300, width * 0.78)} height={200} render={(p) => <PackTile p={p} />} />
+                itemWidth={Math.min(300, width * 0.62)} height={190} render={(p) => <PackTile p={p} />} />
             </View>
           )}
 

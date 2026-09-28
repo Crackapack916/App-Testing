@@ -21,13 +21,12 @@ test("set, lower, remove limits, then a break that blocks ordering and can only 
 
   // One pack (900) fits; a second doesn't.
   await page.getByTestId("tab-packs").click();
-  await page.getByTestId("product-FDN").click();
   await page.getByTestId("qty-1").click();
+  await page.getByTestId("buy").click();
   await page.getByTestId("place-order").click();
   await expect(page.getByTestId("placed")).toBeVisible();
   await page.getByRole("button", { name: "Done" }).click();
-  await page.getByTestId("product-FDN").click();
-  await page.getByTestId("qty-1").click();
+  await page.getByTestId("buy").click();
   await page.getByTestId("place-order").click();
   await expect(page.getByText("That order would pass your weekly spending limit.")).toBeVisible();
   await page.keyboard.press("Escape");
@@ -49,9 +48,8 @@ test("set, lower, remove limits, then a break that blocks ordering and can only 
   await expect(page.getByTestId("limit-weekly-remove")).toHaveCount(0);
   await page.getByTestId("request-end").click();
   await expect(page.getByTestId("end-requested")).toContainText("crackapack.business@gmail.com");
+  // Packs shows the break instead of a Buy button.
   await page.getByTestId("tab-packs").click();
-  await page.getByTestId("product-FDN").click();
-  await page.getByTestId("qty-1").click();
-  await page.getByTestId("place-order").click();
-  await expect(page.getByText("You're on a break. You can't buy packs or add credit until it ends.")).toBeVisible();
+  await expect(page.getByTestId("state-on_break")).toContainText("You're on a break");
+  await expect(page.getByTestId("buy")).toHaveCount(0);
 });

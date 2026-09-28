@@ -4,7 +4,8 @@ import { useAction, useData, useHotkeys } from "./hooks";
 import { Tonight } from "./screens/Tonight";
 import { Session } from "./screens/Session";
 import { LogCards } from "./screens/LogCards";
-import { Notify } from "./screens/Notify";
+import { Videos } from "./screens/Videos";
+import { Drops } from "./screens/Drops";
 import { Stock } from "./screens/Stock";
 import { Ship } from "./screens/Ship";
 
@@ -24,7 +25,8 @@ const TABS = [
   { key: "t", id: "tonight", label: "Tonight" },
   { key: "s", id: "session", label: "Session" },
   { key: "l", id: "log", label: "Log cards" },
-  { key: "n", id: "notify", label: "Notify" },
+  { key: "n", id: "videos", label: "Videos" },
+  { key: "d", id: "drops", label: "Drops" },
   { key: "k", id: "stock", label: "Stock" },
   { key: "p", id: "ship", label: "Ship" },
 ] as const;
@@ -64,7 +66,8 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
         {tab === "tonight" && <Tonight data={tonight.data} reload={tonight.reload} goSession={() => setTab("session")} />}
         {tab === "session" && <Session batch={batch} reload={tonight.reload} />}
         {tab === "log" && <LogCards batch={batch} />}
-        {tab === "notify" && <Notify batch={batch} />}
+        {tab === "videos" && <Videos batch={batch} />}
+        {tab === "drops" && <Drops />}
         {tab === "stock" && <Stock />}
         {tab === "ship" && <Ship />}
       </main>

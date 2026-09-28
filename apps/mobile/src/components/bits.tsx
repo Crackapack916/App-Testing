@@ -8,6 +8,9 @@ import { colors, font, palette, radii, rarityColor, stage, type } from "../lib/t
 import { legalityTags } from "../lib/format";
 
 const GRAIN = require("../../assets/images/grain.png");
+// On web, a repeating CSS background: ImageBackground's repeat mode draws a single tile there.
+const grainWeb = { backgroundImage: `url(${typeof GRAIN === "string" ? GRAIN : GRAIN?.uri ?? GRAIN?.default?.uri ?? ""})`,
+  backgroundRepeat: "repeat", opacity: 0.09 } as object;
 export const SUPPORT_EMAIL = "crackapack.business@gmail.com";
 
 /** Light surface page: blue 100 fading to blue 200. */
@@ -27,8 +30,8 @@ export function Stage({ children, style, safe = true }: { children: ReactNode; s
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, s.glowWrap]}>
         <View style={s.glow} />
       </View>
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <ImageBackground source={GRAIN} resizeMode="repeat" style={StyleSheet.absoluteFill} imageStyle={{ opacity: 0.09 }} />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, Platform.OS === "web" && grainWeb]}>
+        {Platform.OS !== "web" && <ImageBackground source={GRAIN} resizeMode="repeat" style={StyleSheet.absoluteFill} imageStyle={{ opacity: 0.09 }} />}
       </View>
       {body}
     </LinearGradient>

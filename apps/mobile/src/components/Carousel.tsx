@@ -124,9 +124,12 @@ function Slide({ i, pos, step, width, height, reduced, label, onPress, active, c
   return (
     <Animated.View style={[s.slide, { width, height, marginLeft: -width / 2 }, style]}
       role="group" aria-roledescription="slide" aria-label={label} aria-hidden={!active}>
-      <Pressable onPress={onPress} disabled={active} accessibilityElementsHidden={!active} style={{ flex: 1 }}>
-        {children}
-      </Pressable>
+      {/* The center slide's own controls stay usable; a side slide is one button that brings it to the center. */}
+      {active ? <View style={{ flex: 1 }}>{children}</View> : (
+        <Pressable onPress={onPress} accessibilityLabel={`Show ${label}`} style={{ flex: 1 }} tabIndex={-1 as never}>
+          <View pointerEvents="none" style={{ flex: 1 }}>{children}</View>
+        </Pressable>
+      )}
     </Animated.View>
   );
 }

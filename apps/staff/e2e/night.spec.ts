@@ -10,7 +10,7 @@ async function setTime(page: Page, iso: string) {
   await page.evaluate((t) => localStorage.setItem("crackapack.testNow", t), iso);
 }
 
-test("a full night: lock, film in strict order, log cards, notify", async ({ page }) => {
+test("a full night: lock, film in strict order, log cards, upload videos, approve", async ({ page }) => {
   await page.goto("/ops/");
   await setTime(page, "2026-10-01T19:02:00-07:00");
   await page.getByLabel("Email").fill("ops@e2e.test");
@@ -94,13 +94,69 @@ test("a full night: lock, film in strict order, log cards, notify", async ({ pag
   await expect(page.getByTestId("history")).toContainText("amended slot 2");
   await expect(page.getByTestId("history")).toContainText("Video shows a foil");
 
-  // Notify: both orders are ready.
+  // Videos: one file per pack from the queue view, then approve and notify.
   await page.keyboard.press("n");
-  await expect(page.getByTestId("ready")).toHaveText("2");
-  await shot(page, "4-notify");
-  await page.getByTestId("notify").click();
-  await expect(page.getByTestId("ready")).toHaveText("0");
-  await expect(page.getByTestId("orders").locator("tbody tr td:last-child")).toHaveText(["notified", "notified"]);
+  await expect(page.getByTestId("videos-ready")).toHaveText("0 / 3");
+  await expect(page.getByTestId("approve")).toBeDisabled();
+  // A file this browser can't play (like HEVC) is refused with a clear warning.
+  await page.getByTestId("upload-1").setInputFiles({ name: "IMG_0001.mov", mimeType: "video/quicktime", buffer: Buffer.from("not really a video") });
+  await expect(page.getByTestId("upload-error-1")).toContainText("Most Compatible");
+  const video = await recordVideo(page);
+  for (const pos of [1, 2, 3]) {
+    await page.getByTestId(`upload-${pos}`).setInputFiles({ name: `pack-${pos}.mp4`, mimeType: "video/mp4", buffer: video });
+    await expect(page.getByTestId(`video-status-${pos}`)).toHaveText("ready", { timeout: 20_000 });
+  }
+  await expect(page.getByTestId("videos-ready")).toHaveText("3 / 3");
+  await page.getByTestId("preview-2").click();
+  const player = page.getByTestId("preview-player");
+  await expect(player).toBeVisible();
+  await expect.poll(() => player.evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2);   // decodes: playable, scrubbable
+  await shot(page, "4-videos");
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByTestId("approve").click();
+  await expect(page.getByTestId("notified")).toHaveText("Notified 2 orders.");
+  await expect(page.getByTestId("video-status-1")).toHaveText("approved");
+});
+
+/** A short real mp4, recorded in the browser from a canvas (Chromium writes VP9 in mp4). */
+async function recordVideo(page: Page) {
+  const b64 = await page.evaluate(async () => {
+    const c = document.createElement("canvas");
+    c.width = 320; c.height = 180;
+    const g = c.getContext("2d")!;
+    const rec = new MediaRecorder(c.captureStream(24), { mimeType: "video/mp4" });
+    const parts: Blob[] = [];
+    rec.ondataavailable = (e) => parts.push(e.data);
+    const stopped = new Promise((r) => (rec.onstop = r));
+    rec.start();
+    for (let i = 0; i < 30; i++) { g.fillStyle = `hsl(${i * 12}, 40%, 40%)`; g.fillRect(0, 0, 320, 180); await new Promise((r) => setTimeout(r, 40)); }
+    rec.stop();
+    await stopped;
+    const buf = new Uint8Array(await new Blob(parts).arrayBuffer());
+    let s = ""; for (const x of buf) s += String.fromCharCode(x);
+    return btoa(s);
+  });
+  return Buffer.from(b64, "base64");
+}
+
+test("drops: create a drop with a preview, publish it", async ({ page }) => {
+  await page.goto("/ops/");
+  await setTime(page, "2026-10-02T09:00:00-07:00");
+  await page.getByLabel("Email").fill("ops@e2e.test");
+  await page.getByLabel("Password").fill("ops password");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page.getByRole("button", { name: /Drops/ })).toBeVisible();
+  await page.keyboard.press("d");
+  await page.getByTestId("new-drop").click();
+  await page.getByTestId("drop-starts").fill("2026-10-10T12:00");
+  await page.getByTestId("drop-packs").fill("60");
+  await expect(page.getByTestId("drop-preview")).toContainText("Sat, Oct 10, 12:00 PM PT");
+  await expect(page.getByTestId("drop-preview")).toContainText("Not shown to customers");
+  await page.getByTestId("drop-status").selectOption("published");
+  await page.getByTestId("save-drop").click();
+  await expect(page.getByTestId("drop-FDN")).toContainText("published, upcoming");
+  await expect(page.getByTestId("drop-FDN")).toContainText("0 / 60");
+  await shot(page, "7-drops");
 });
 
 test("put a set on sale: create, receive a box, turn it on", async ({ page }) => {

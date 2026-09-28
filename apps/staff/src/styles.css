@@ -130,3 +130,23 @@ input.small { width: 90px; text-align: right; }
   main { padding: 12px; }
   .entry { flex-wrap: wrap; }
 }
+/* Videos */
+.small { font-size: 12px; }
+.check { display: flex; align-items: center; gap: 8px; color: var(--text); }
+.check input { width: auto; }
+tr.flag td { background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.chip.v-missing { border-color: var(--error); } .chip.v-uploading, .chip.v-processing { border-color: var(--warning); }
+.chip.v-ready { border-color: var(--accent); } .chip.v-approved { border-color: var(--success); }
+.file { display: inline-flex; align-items: center; position: relative; cursor: pointer; border: 1px solid var(--blue-500); border-radius: var(--radius); padding: 6px 12px; color: var(--link); font-weight: 600; }
+.file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload { display: grid; gap: 6px; min-width: 150px; }
+.upload .progress { flex: none; width: 150px; }
+.modal .panel.wide { width: min(900px, 100%); }
+/* Drops */
+select { font: inherit; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.editor { margin-top: 16px; display: grid; gap: 12px; border-top: 1px solid var(--line); padding-top: 16px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.grid3 { display: grid; grid-template-columns: 1fr 2fr 2fr auto; gap: 12px; align-items: end; margin-top: 12px; }
+.grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.drop-preview { display: grid; gap: 4px; padding: 12px 14px; border-left: 4px solid var(--sky-200); background: var(--blue-100); border-radius: 6px; }
+@media (max-width: 700px) { .grid3 { grid-template-columns: 1fr; } }
