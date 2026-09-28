@@ -57,6 +57,7 @@ const CODES: Record<string, [number, string]> = {
   vault_balance_non_negative: [409, "You don't have that many copies in your vault."],
   price_missing: [409, "That card has no price yet."],
   price_stale: [409, "Prices are updating. Try again shortly."],
+  buyback_disabled: [403, "Selling cards back isn't available. Keep them in your vault or ship them."],
   no_items: [400, "Choose at least one card."],
   purchased_non_negative: [409, "Not enough refundable credit."],
   // shipping

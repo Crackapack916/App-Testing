@@ -38,7 +38,7 @@ async function runNight(request: APIRequestContext) {
   expect((await call("post", `/staff/batches/${batch.id}/notify`, at(9))).notified).toBe(1);
 }
 
-test("a customer's night: order, get cracked, reveal, vault, sell back, search", async ({ page, request }) => {
+test("a customer's night: order, get cracked, reveal, vault, ship, search", async ({ page, request }) => {
   await page.goto("/");
   await setNow(page, BEFORE);
   await page.getByTestId("email").fill("alice@e2e.test");
@@ -88,12 +88,19 @@ test("a customer's night: order, get cracked, reveal, vault, sell back, search",
   await expect(page.getByTestId("vault-value")).toHaveText("$63.90");
   await shot(page, "m5-vault");
 
-  // Sell the commons back: 5 x $3.50 at 90% = 1,575 credits, earned (non withdrawable).
+  // Sell back is off for the test run: keep it in the vault or ship it.
+  // Ship the commons: 5 x $3.50 = $17.50, under $50, so 499 credits shipping.
   await page.getByTestId("holding-FDN-7").click();
-  await page.getByTestId("sell").click();
-  await expect(page.getByTestId("quote")).toHaveText("1,575 credits");
-  await page.getByTestId("confirm-sell").click();
-  await expect(page.getByTestId("sold")).toContainText("1,575 credits added");
+  await expect(page.getByTestId("sell")).toHaveCount(0);
+  await page.getByTestId("ship").click();
+  await page.getByTestId("addr-name").fill("Alice Example");
+  await page.getByTestId("addr-line1").fill("1 K St");
+  await page.getByTestId("addr-city").fill("Sacramento");
+  await page.getByTestId("addr-state").fill("CA");
+  await page.getByTestId("addr-zip").fill("95814");
+  await page.getByTestId("request-shipment").click();
+  await expect(page.getByText("Shipping requested")).toBeVisible();
+  await expect(page.getByText("499 credits shipping.")).toBeVisible();
   await page.getByRole("button", { name: "Done" }).click();
   await expect(page.getByTestId("holding-FDN-7")).toHaveCount(0);
 

@@ -46,7 +46,7 @@ export default function Account() {
         <Panel>
           <Text style={s.label}>Credit balance</Text>
           <Text style={s.big} testID="account-credits">{credits(me?.credits.total)}</Text>
-          <Text style={s.muted}>{credits(me?.credits.refundable)} purchased (refundable while unspent) · {credits(me?.credits.earned)} from sell backs</Text>
+          <Text style={s.muted}>{credits(me?.credits.refundable)} purchased (refundable while unspent){me?.features.buyback ? ` · ${credits(me?.credits.earned)} from sell backs` : ""}</Text>
           <View style={s.bundles}>
             {bundles.data?.bundles.map((b) => (
               <Pressable key={b.key} onPress={() => buy(b)} style={s.bundle}>

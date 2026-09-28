@@ -32,10 +32,12 @@ customer.get("/me", async (c) => {
   const { rows: [acct] } = await c.get("db").query(
     `select coalesce(purchased, 0)::int as purchased, coalesce(earned, 0)::int as earned,
             (select age_verified_at is not null from users where id = $1) as age_verified,
-            (select state_code from users where id = $1) as state
+            (select state_code from users where id = $1) as state,
+            (select buyback_enabled from system_config) as buyback
      from (select 1) x left join credit_accounts a on a.user_id = $1`, [u.id]);
   return c.json({ id: u.id, display_name: u.display_name, role: u.role, age_verified: acct.age_verified, state: acct.state,
-    credits: { total: acct.purchased + acct.earned, refundable: acct.purchased, earned: acct.earned } });
+    credits: { total: acct.purchased + acct.earned, refundable: acct.purchased, earned: acct.earned },
+    features: { buyback: acct.buyback } });
 });
 
 // Age gate: birthdate and state (self attested in the pilot).
@@ -148,6 +150,8 @@ customer.get("/me/notifications", async (c) => {
 // Quote before selling. The real price is re-quoted inside request_buyback.
 customer.post("/me/buyback/quote", async (c) => {
   const { items } = await c.req.json<{ items: { card_id: string; finish: string; qty?: number }[] }>();
+  const { rows: [cfg] } = await c.get("db").query("select buyback_enabled from system_config");
+  if (!cfg.buyback_enabled) throw new ApiError("buyback_disabled");
   const { rows } = await c.get("db").query(
     `select i.card_id, i.finish, i.qty, p.market_cents::int, buylist_quote(p.market_cents, current_buylist_schedule())::int as quote_each,
             (p.card_id is null or p.price_asof < app_now() - (cfg()).max_price_age) as stale

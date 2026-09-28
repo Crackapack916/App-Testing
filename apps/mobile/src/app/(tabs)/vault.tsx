@@ -20,6 +20,8 @@ const asItem = (h: Holding, qty: number) => h.individual_card_id
   : { card_id: h.card_id, finish: h.finish, condition: h.condition, qty };
 
 export default function Vault() {
+  const { me } = useSession();
+  const canSell = !!me?.features.buyback;
   const vault = useApi<{ cards: Holding[]; total_market_cents: number }>("/me/vault");
   const pulls = useApi<{ pulls: Pull[] }>("/me/pulls");
   const [selected, setSelected] = useState<Record<string, number>>({});
@@ -86,8 +88,8 @@ export default function Vault() {
         <View style={s.bar}>
           <Text style={s.body}>{chosen.reduce((n, c) => n + c.qty, 0)} selected</Text>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <Button testID="ship" kind="ghost" label="Ship" onPress={() => setAction("ship")} />
-            <Button testID="sell" label="Sell for credit" onPress={() => setAction("sell")} />
+            <Button testID="ship" kind={canSell ? "ghost" : undefined} label="Ship to me" onPress={() => setAction("ship")} />
+            {canSell && <Button testID="sell" label="Sell for credit" onPress={() => setAction("sell")} />}
           </View>
         </View>
       )}
@@ -183,7 +185,7 @@ function ShipSheet({ items, onClose, onDone }: { items: { h: Holding; qty: numbe
             <View style={{ flex: 1 }}>{field("state", "State")}</View>
             <View style={{ flex: 1 }}>{field("zip", "ZIP")}</View>
           </View>
-          <Button label="Request shipment" onPress={ship} busy={busy} disabled={!addr.name || !addr.line1 || !addr.zip} />
+          <Button testID="request-shipment" label="Request shipment" onPress={ship} busy={busy} disabled={!addr.name || !addr.line1 || !addr.zip} />
           <ErrorText>{error}</ErrorText>
         </>
       )}

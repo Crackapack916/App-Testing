@@ -72,7 +72,28 @@ describe("buylist", () => {
   });
 });
 
+describe("buyback switch", () => {
+  it("refuses sell back while switched off (the test run default) and allows it once on", async () => {
+    const u = await makeUser(db, { credits: 900 });
+    const c = await makeCard(db, { priceCents: 300 });
+    await pull(u, [{ card: c }]);
+    const items = JSON.stringify([{ card_id: c, finish: "nonfoil", qty: 1 }]);
+    expect((await db.one("select buyback_enabled from system_config")).buyback_enabled).toBe(false);
+    await expect(run("select request_buyback($1, $2, 'off')", [u, items])).rejects.toThrow(/buyback_disabled/);
+    // Nothing left the vault.
+    expect((await db.one("select qty from vault_balances where user_id = $1 and card_id = $2", [u, c])).qty).toBe(1);
+    await expect(db.q("insert into buyback_requests (user_id, schedule_id, total_credits, status, created_at) values ($1, 1, 0, 'completed', now())", [u]))
+      .rejects.toThrow(/buyback_disabled/);
+
+    await db.q("update system_config set buyback_enabled = true");
+    await run("select request_buyback($1, $2, 'on')", [u, items]);
+    expect(await db.q("select qty from vault_balances where user_id = $1 and card_id = $2", [u, c])).toEqual([{ qty: 0 }]);
+  });
+});
+
 describe("buyback", () => {
+  beforeEach(async () => { await db.q("update system_config set buyback_enabled = true"); });
+
   it("credits earned (non withdrawable) credit and moves the cards to house stock", async () => {
     const u = await makeUser(db, { credits: 900 });
     const c = await makeCard(db, { priceCents: 300 });
@@ -121,6 +142,7 @@ describe("buyback", () => {
 
     const soon = new Date(Date.parse(NOW) + 3600_000).toISOString();
     expect(Number((await atTime(db, soon, "select release_held_buybacks() as n"))[0].n)).toBe(0);
+    await db.q("update system_config set buyback_enabled = false");
     const later = new Date(Date.parse(NOW) + 73 * 3600_000).toISOString();
     expect(Number((await atTime(db, later, "select release_held_buybacks() as n"))[0].n)).toBe(1);
     expect((await db.one("select earned::int from credit_accounts where user_id = $1", [u])).earned).toBe(13500);

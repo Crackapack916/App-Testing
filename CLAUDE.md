@@ -16,6 +16,7 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 * Payments: Stripe sandbox `acct_1UKC1BRkzwzDtkIa`, product `prod_VL0BnbAdob27Ft` "CrackAPack Credits". Bundles are prices with lookup keys `credits_900`, `credits_2550`, `credits_4950`, `credits_7200`, `credits_9300`, one per pack ladder tier; code references lookup keys, never price ids. Credits are sold through web checkout, not in app purchase.
 * Processors plug in through `PaymentProcessor` in `packages/payments`. Webhooks go through `handleWebhook`, which writes only via `record_credit_purchase` and `refund_purchased_credits`.
 * Mode is `test` until counsel clears the structure.
+* Sell back (buyback) is off for the test run: `system_config.buyback_enabled` defaults to false and a trigger refuses any buyback request while it is off. Customers keep cards in the vault or ship them. Turn it on only when the resale side is built.
 * Compliance mitigations in the database: 18+ age gate (`set_profile`, birthdate locked once verified), rolling 24 hour and 30 day spend caps with platform maximums (raising a limit waits 24 hours), and customer breaks that can't be shortened. Enforced by the `orders_spend_guard` trigger.
 * Scheduled jobs (`packages/db/scripts/jobs.ts`, every 15 minutes via `.github/workflows/jobs.yml`): lock queues past their cutoff, release held buybacks.
 

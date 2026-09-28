@@ -106,6 +106,10 @@ Sign in to the app as `player@crackapack.test` and to `/ops/` as `staff@crackapa
 
 Install the build from the link EAS prints, then check on the device: the pack tear sound and haptic, the foil shimmer following tilt, the big hit cue, and a real "You just cracked a pack" push.
 
+## Sell back switch
+
+Sell back is off for the test run; customers keep cards in the vault or ship them. To turn it on later (Neon SQL editor): `update system_config set buyback_enabled = true;` The app shows the Sell button as soon as it is on.
+
 ## Before real customers (not setup, but blocking)
 
 * The California gambling law opinion on this structure (context file sections 3 and 10).

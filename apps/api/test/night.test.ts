@@ -246,6 +246,12 @@ describe("a full night over the API", () => {
     expect(orders[0]).toMatchObject({ status: "fulfilled", positions: [1, 2], packs_opened: 2, clip_ref: clips[0].clip_ref });
     expect((await call("GET", "/me/notifications", { token: bob.token })).body.notifications).toHaveLength(1);
 
+    // Sell back is off by default (test run): refused with a clear message, and the app hides it.
+    expect((await call("GET", "/me", { token: alice.token })).body.features).toEqual({ buyback: false });
+    const off = await call("POST", "/me/buyback/quote", { token: alice.token, body: { items: [{ card_id: rare, finish: "nonfoil" }] } });
+    expect([off.status, off.body.error]).toEqual([403, "buyback_disabled"]);
+    await db.q("update system_config set buyback_enabled = true");
+
     // Buyback the mythic through the API.
     const q = await call("POST", "/me/buyback/quote", { token: alice.token, body: { items: [{ card_id: rare, finish: "nonfoil" }] } });
     expect(q.body).toMatchObject({ total_credits: 4050, stale: false });

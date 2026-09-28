@@ -28,6 +28,7 @@ describe("scheduled jobs", () => {
   });
 
   it("credits a held buyback only after its window ends, exactly once", async () => {
+    await db.q("update system_config set buyback_enabled = true");
     const u = await makeUser(db);
     await db.q(
       `insert into buyback_requests (user_id, schedule_id, total_credits, status, hold_until, created_at)

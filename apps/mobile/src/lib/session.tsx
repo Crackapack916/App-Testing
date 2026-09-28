@@ -5,7 +5,7 @@ import { api, setTokenProvider } from "./api";
 import { storage } from "./storage";
 
 export type Me = { id: string; display_name: string | null; role: string; age_verified: boolean; state: string | null;
-  credits: { total: number; refundable: number; earned: number } };
+  credits: { total: number; refundable: number; earned: number }; features: { buyback: boolean } };
 type Session = {
   ready: boolean;
   me: Me | null;
