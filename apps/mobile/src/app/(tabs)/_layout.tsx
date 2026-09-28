@@ -1,13 +1,17 @@
 import { Tabs } from "expo-router";
-import { TabBar } from "../../components/TabBar";
+import { useWindowDimensions } from "react-native";
+import { DESKTOP, TabBar } from "../../components/TabBar";
 
-/** Four tabs. Packs is the default landing tab and sits raised in the center. */
+/** Five tabs: Drops, Search, Packs (center, default), Vault, Account. A top bar on desktop widths. */
 export default function TabsLayout() {
+  const { width } = useWindowDimensions();
   return (
-    <Tabs initialRouteName="packs" backBehavior="initialRoute" screenOptions={{ headerShown: false }} tabBar={(p) => <TabBar {...p} />}>
-      <Tabs.Screen name="vault" />
+    <Tabs initialRouteName="packs" backBehavior="initialRoute" tabBar={(p) => <TabBar {...p} />}
+      screenOptions={{ headerShown: false, tabBarPosition: width >= DESKTOP ? "top" : "bottom" }}>
+      <Tabs.Screen name="drops" />
       <Tabs.Screen name="search" />
       <Tabs.Screen name="packs" />
+      <Tabs.Screen name="vault" />
       <Tabs.Screen name="account" />
     </Tabs>
   );

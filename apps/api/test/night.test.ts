@@ -12,6 +12,7 @@ let emails: EmailMessage[];
 // Stands in for Vercel Blob: the browser "uploaded" whatever is in `stored`.
 const stored = new Map<string, number>();
 const videos: VideoStorage = {
+  kind: "blob",
   clientUpload: async () => ({ ok: true }),
   sizeOf: async (p) => stored.get(p) ?? null,
   signedUrl: async (p, s) => `https://blob.test/${p}?expires=${s}`,

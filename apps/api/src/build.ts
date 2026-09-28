@@ -5,7 +5,7 @@ import { linkClips, muxClips } from "./clips";
 import { dobKeyFrom } from "./secrets";
 import { logEmail } from "./email";
 import { scryfallProvider } from "@crackapack/catalog/lookup";
-import { blobStorage } from "./videos";
+import { blobStorage, localVideos } from "./videos";
 
 /** Builds the API from environment variables. Shared by the Node server and the Vercel entry. */
 export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
@@ -19,8 +19,8 @@ export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
   // as any email, and the test clock would let a customer order after the cutoff.
   // CRACKAPACK_ENV, not NODE_ENV: Vercel sets NODE_ENV=production on every deploy, previews included.
   const production = env.CRACKAPACK_ENV === "production";
-  if (production && (env.DEV_LOGIN === "1" || env.TEST_CLOCK === "1")) {
-    throw new Error("DEV_LOGIN and TEST_CLOCK are not allowed when CRACKAPACK_ENV=production");
+  if (production && (env.DEV_LOGIN === "1" || env.TEST_CLOCK === "1" || env.VIDEO_DIR)) {
+    throw new Error("DEV_LOGIN, TEST_CLOCK and VIDEO_DIR are not allowed when CRACKAPACK_ENV=production");
   }
 
   // Birthdates are stored only encrypted, so production cannot run without the key.
@@ -28,7 +28,6 @@ export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
 
   // Serverless instances should each hold only a few connections (PG_POOL_MAX=3 on Vercel).
   const pool = new pg.Pool({ connectionString: required("DATABASE_URL"), max: Number(env.PG_POOL_MAX ?? 10) });
-  // PUSH=log prints instead of sending (local and e2e runs).
 
   const app = createApp({
     pool,
@@ -42,7 +41,9 @@ export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
       : undefined,
     dobKey: dobKeyFrom(env.DOB_ENCRYPTION_KEY),
     cardData: scryfallProvider(),
-    videos: env.BLOB_READ_WRITE_TOKEN ? blobStorage(env.BLOB_READ_WRITE_TOKEN) : undefined,
+    // Vercel Blob in the cloud; VIDEO_DIR (local disk) for pilot runs and tests.
+    videos: env.BLOB_READ_WRITE_TOKEN ? blobStorage(env.BLOB_READ_WRITE_TOKEN)
+      : env.VIDEO_DIR ? localVideos(env.VIDEO_DIR, required("JWT_SECRET")) : undefined,
     email: logEmail(),
     appUrl: (env.APP_URL ?? "http://localhost:8081").replace(/\/$/, ""),
     clips: env.MUX_TOKEN_ID

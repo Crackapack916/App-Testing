@@ -3,6 +3,12 @@ import type pg from "pg";
 import { requireUser } from "../auth";
 import { ApiError } from "../errors";
 import type { ClipService, Env } from "../context";
+import type { localVideos } from "../videos";
+import { createWriteStream } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 /**
  * The nightly operations tool. Staff never choose a customer or a pack: the only way to
@@ -299,6 +305,9 @@ staff.post("/orders/:id/clip/retry", async (c) => {
   return c.json({ status: out.status });
 });
 
+/** Local storage links are paths on the API; Blob links are already absolute. */
+const absolute = (requestUrl: string, url: string) => new URL(url, requestUrl).toString();
+
 // Videos and approval (item 11) ---------------------------------------------------------
 
 // Every pack in the batch in queue order, with its video and logging status.
@@ -342,7 +351,24 @@ staff.post("/videos/token", async (c) => {
     if (m[1] === "masters") return (await db.query("select 1 from batches where id = $1 and status in ('locked', 'in_session', 'completed')", [m[2]])).rowCount === 1;
     return (await db.query("select 1 from pack_videos where pack_opening_id = $1 and status = 'uploading'", [m[2]])).rowCount === 1;
   });
-  return c.json(out);
+  return c.json({ ...(out as object), kind: videos.kind });
+});
+
+// Local storage only (pilot and tests): the browser PUTs the file here instead of to Vercel Blob.
+staff.put("/videos/local/*", async (c) => {
+  const videos = c.get("services").videos as ReturnType<typeof localVideos> | undefined;
+  if (videos?.kind !== "local") throw new ApiError("videos_unavailable", 503);
+  const pathname = c.req.path.replace(/^.*\/videos\/local\//, "");
+  const m = VIDEO_PATH.exec(pathname);
+  const db = c.get("db");
+  const ok = m && (m[1] === "masters"
+    ? (await db.query("select 1 from batches where id = $1 and status in ('locked', 'in_session', 'completed')", [m[2]])).rowCount === 1
+    : (await db.query("select 1 from pack_videos where pack_opening_id = $1 and status = 'uploading'", [m[2]])).rowCount === 1);
+  if (!ok) throw new ApiError("forbidden");
+  const file = videos.file(pathname);
+  await mkdir(dirname(file), { recursive: true });
+  await pipeline(Readable.fromWeb(c.req.raw.body as never), createWriteStream(file));
+  return c.json({ pathname });
 });
 
 staff.post("/packs/:id/video/start", async (c) => {
@@ -372,8 +398,8 @@ staff.get("/packs/:id/video", async (c) => {
   if (!videos) throw new ApiError("videos_unavailable", 503);
   const { rows: [v] } = await c.get("db").query("select pathname, content_type, thumbnail_pathname from pack_videos where pack_opening_id = $1 and pathname is not null", [c.req.param("id")]);
   if (!v) throw new ApiError("unknown_video", 404);
-  return c.json({ url: await videos.signedUrl(v.pathname, 3600), content_type: v.content_type,
-    poster: v.thumbnail_pathname ? await videos.signedUrl(v.thumbnail_pathname, 3600) : null });
+  return c.json({ url: absolute(c.req.url, await videos.signedUrl(v.pathname, 3600)), content_type: v.content_type,
+    poster: v.thumbnail_pathname ? absolute(c.req.url, await videos.signedUrl(v.thumbnail_pathname, 3600)) : null });
 });
 
 staff.post("/batches/:id/session-master", async (c) => {

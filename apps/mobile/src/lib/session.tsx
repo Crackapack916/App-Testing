@@ -3,7 +3,7 @@ import { api, setTokenProvider } from "./api";
 import { storage } from "./storage";
 
 export type Me = { id: string; display_name: string | null; email: string; role: string; age_verified: boolean;
-  credits: { total: number; refundable: number; earned: number }; features: { buyback: boolean } };
+  credits: { total: number; refundable: number; earned: number }; features: { buyback: boolean }; unseen_cracked: number };
 export type Dob = { month: string; day: string; year: string };
 type Session = {
   ready: boolean;

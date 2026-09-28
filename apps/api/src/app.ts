@@ -11,12 +11,15 @@ import { dev } from "./routes/dev";
 import { cards } from "./routes/cards";
 import { auth } from "./routes/auth";
 import { drops } from "./routes/drops";
+import { localVideoFiles } from "./routes/local-videos";
 
 export function createApp(options: ServiceOptions) {
   const services: Services = { email: logEmail(), dobKey: null, appUrl: "http://localhost:8081", ...options };
   const app = new Hono<Env>();
   app.use("*", cors());
-  app.use("*", bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: "payload_too_large", message: "Request too large." }, 413) }));
+  // Local video uploads (pilot and tests only) are the one exception to the size cap.
+  const limit = bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: "payload_too_large", message: "Request too large." }, 413) });
+  app.use("*", (c, next) => c.req.method === "PUT" && c.req.path.startsWith("/staff/videos/local/") ? next() : limit(c, next));
 
   // One pooled connection per request. In test mode, X-Test-Now pins app_now() for it.
   app.use("*", async (c, next) => {
@@ -43,6 +46,7 @@ export function createApp(options: ServiceOptions) {
   app.route("/auth", auth);
   app.route("/", cards);
   app.route("/", drops);
+  app.route("/", localVideoFiles);
   app.route("/", customer);
   app.route("/staff", staff);
   app.route("/webhooks", webhooks);

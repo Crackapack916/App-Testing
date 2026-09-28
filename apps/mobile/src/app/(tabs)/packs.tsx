@@ -1,149 +1,226 @@
 import { useEffect, useState } from "react";
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ExternalLink, Minus, Plus } from "lucide-react-native";
 import { Text } from "../../components/Text";
-import { Button, ErrorText, Panel, Screen } from "../../components/bits";
+import { Button, ErrorText, Footer, Stage } from "../../components/bits";
+import { Carousel } from "../../components/Carousel";
 import { PackArt } from "../../components/PackArt";
-import { CardImage } from "../../components/CardImage";
 import { api } from "../../lib/api";
 import { useApi } from "../../lib/useApi";
 import { useSession } from "../../lib/session";
-import { credits, countdown, dollars } from "../../lib/format";
+import { countdownText, useServerNow } from "../../lib/clock";
+import { credits, dollars, pacific } from "../../lib/format";
 import { haptic } from "../../lib/feedback";
-import { colors, radius, font } from "../../lib/theme";
+import { font, palette, radii, stage, type } from "../../lib/theme";
 
 type Tier = { min_qty: number; per_pack_credits: number };
-type Product = { product_id: string; set_code: string; set_name: string; booster_type: string; name: string;
-  single_pack_credits: string; available_packs: number; available: boolean; ladder: Tier[] };
-type Storefront = { products: Product[]; next_cutoff: string; batch_date: string; now: string };
-type BigPull = { name: string; set_code: string; collector_number: string; rarity: string; finish: string; image_url: string | null; set_name: string };
+type Status = "available" | "sold_out" | "limit_reached" | "upcoming" | "ended" | "on_break";
+export type Product = { product_id: string; set_code: string; set_name: string; booster_type: string; name: string; icon_svg_uri: string | null;
+  wizards_info_url: string | null; pack_image_url: string | null; ladder: Tier[]; drop_id: string | null; drop_starts_at: string | null;
+  drop_ends_at: string | null; drop_state: string | null; held: number; set_limit: number; left_for_you: number; max_qty: number; status: Status };
+type Storefront = { products: Product[]; next_cutoff: string; batch_date: string; now: string; break_until: string | null };
 
-const QUANTITIES = [1, 3, 6, 9, 12];
-const perPack = (ladder: Tier[], qty: number) => [...ladder].reverse().find((t) => t.min_qty <= qty)?.per_pack_credits ?? 0;
+const CHIPS = [1, 3, 6];
+export const perPack = (ladder: Tier[], qty: number) => [...ladder].reverse().find((t) => t.min_qty <= qty)?.per_pack_credits ?? 0;
 
+/** Packs (item 9): the dark stage, a carousel of the sets on sale, and one pinned Buy button. */
 export default function Packs() {
-  const { me } = useSession();
-  const store = useApi<Storefront>("/storefront");
-  const feed = useApi<{ pulls: BigPull[] }>("/feed/big-pulls");
-  const [ordering, setOrdering] = useState<Product | null>(null);
-  // Count down on the server's clock: a phone's clock can be minutes (or days) off.
-  const [skew, setSkew] = useState(0);
-  useEffect(() => { if (store.data?.now) setSkew(new Date(store.data.now).getTime() - Date.now()); }, [store.data?.now]);
-  const now = useNow(30_000) + skew;
-
-  return (
-    <Screen>
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <View style={s.header}>
-          <View>
-            <Text style={s.h1}>Packs</Text>
-            <Text style={s.sub} testID="cutoff">
-              {store.data ? `Tonight's queue locks in ${countdown(store.data.next_cutoff, now)} · opened live 7 to 8pm PT` : " "}
-            </Text>
-          </View>
-          <View style={s.balance}>
-            <Text style={s.balanceNum} testID="balance">{credits(me?.credits.total)}</Text>
-            <Text style={s.balanceLabel}>credits</Text>
-          </View>
-        </View>
-
-        {!!feed.data?.pulls.length && (
-          <View style={{ marginBottom: 12 }}>
-            <Text style={s.section}>Big pulls this week</Text>
-            <FlatList horizontal data={feed.data.pulls} keyExtractor={(p, i) => `${p.set_code}${p.collector_number}${i}`}
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }} showsHorizontalScrollIndicator={false}
-              renderItem={({ item }) => <CardImage card={item} width={84} />} />
-          </View>
-        )}
-
-        <Text style={s.section}>On sale tonight</Text>
-        <View style={{ paddingHorizontal: 16, gap: 12 }}>
-          {store.data?.products.map((p) => (
-            <Pressable key={p.product_id} testID={`product-${p.set_code}`} disabled={!p.available}
-              onPress={() => { haptic.tap(); setOrdering(p); }} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
-              <Panel style={s.product}>
-                <PackArt setCode={p.set_code} setName={p.set_name} boosterType={p.booster_type} width={92} />
-                <View style={{ flex: 1, gap: 6 }}>
-                  <Text style={s.pname}>{p.name}</Text>
-                  <Text style={s.price}>{credits(Number(p.single_pack_credits))} credits <Text style={s.muted}>per pack</Text></Text>
-                  <Text style={s.muted}>From {dollars(Math.min(...p.ladder.map((t) => t.per_pack_credits)))} a pack in bigger orders</Text>
-                  <Text style={[s.stock, !p.available && { color: colors.danger }]}>
-                    {p.available ? "Sealed stock available" : "Sold out of sealed stock tonight"}
-                  </Text>
-                </View>
-              </Panel>
-            </Pressable>
-          ))}
-          {store.data && !store.data.products.length && <Text style={s.muted}>No sets on sale right now.</Text>}
-          <ErrorText>{store.error}</ErrorText>
-        </View>
-
-        <Text style={s.how}>
-          How it works: your pack stays sealed. Orders before 7pm Pacific join tonight's queue, which locks at the cutoff.
-          We open each pack on camera in queue order, and you get your clip and cards by 9pm.
-        </Text>
-      </ScrollView>
-
-      <OrderSheet product={ordering} onClose={() => setOrdering(null)}
-        onPlaced={() => { store.reload(); }} />
-    </Screen>
-  );
-}
-
-function OrderSheet({ product, onClose, onPlaced }: { product: Product | null; onClose: () => void; onPlaced: () => void }) {
   const { me, refresh } = useSession();
+  const store = useApi<Storefront>("/storefront");
+  const limits = useApi<{ suggest_limit: boolean }>(me ? "/me/limits" : null);
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [index, setIndex] = useState(0);
   const [qty, setQty] = useState(1);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [placed, setPlaced] = useState<string | null>(null);
-  useEffect(() => { setQty(1); setError(null); setPlaced(null); }, [product?.product_id]);
-  if (!product) return null;
-  const each = perPack(product.ladder, qty);
-  const total = each * qty;
-  const short = (me?.credits.total ?? 0) < total;
+  const [confirming, setConfirming] = useState(false);
+  const now = useServerNow(store.data?.now);
+  const products = store.data?.products ?? [];
+  const p = products[Math.min(index, products.length - 1)];
+  const max = p?.max_qty ?? 0;
+  useEffect(() => { setQty((q) => Math.max(1, Math.min(q, max || 1))); }, [p?.product_id, max]);
 
-  const place = async () => {
-    setBusy(true); setError(null);
-    try {
-      const r = await api<{ order_id: string }>("POST", "/orders", { product_id: product.product_id, quantity: qty });
-      haptic.bigHit();
-      setPlaced(r.order_id);
-      await refresh();
-      onPlaced();
-    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  const each = p ? perPack(p.ladder, qty) : 0;
+  const total = each * qty;
+  const balance = me?.credits.total ?? 0;
+  const itemWidth = Math.min(230, width * 0.52);
+
+  const buy = () => {
+    if (!me) return router.push("/sign-in");
+    if (balance < total) return router.push("/add-credits");
+    haptic.tap();
+    setConfirming(true);
   };
 
   return (
+    <Stage>
+      <ScrollView contentContainerStyle={{ paddingBottom: 110 }}>
+        <View style={s.head}>
+          <Text style={s.h1} accessibilityRole="header">Packs</Text>
+          {me ? (
+            <Pressable onPress={() => router.push("/account")} accessibilityRole="link" accessibilityLabel={`${credits(balance)} credits`} style={s.balance}>
+              <Text style={s.balanceNum} testID="balance">{credits(balance)}</Text>
+              <Text style={s.balanceLabel}>credits</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {store.data && !products.length ? (
+          <View style={s.none}>
+            <Text style={s.title}>Nothing on sale right now</Text>
+            <Text style={s.muted}>See Drops for when the next set goes live.</Text>
+            <Button kind="ghost" onStage label="See drops" onPress={() => router.push("/drops")} />
+          </View>
+        ) : null}
+
+        {products.length > 0 && (
+          <>
+            <View style={s.glowWrap} pointerEvents="none"><View style={[s.glow, { width: itemWidth * 1.4, height: itemWidth * 1.4 }]} /></View>
+            <Carousel testID="pack-carousel" label="Sets on sale" onStage items={products} index={index} onIndexChange={setIndex}
+              keyOf={(x) => x.product_id} labelOf={(x) => x.name} itemWidth={itemWidth} height={Math.round(itemWidth * 1.62) + 24}
+              render={(x) => (
+                <View style={{ alignItems: "center", paddingTop: 12 }}>
+                  <PackArt setCode={x.set_code} setName={x.set_name} boosterType={x.booster_type} photo={x.pack_image_url} icon={x.icon_svg_uri} width={itemWidth} />
+                </View>
+              )} />
+          </>
+        )}
+
+        {p && (
+          <View style={s.detail} testID={`product-${p.set_code}`}>
+            <Text style={s.title}>{p.name}</Text>
+            <Text style={s.price}>
+              <Text style={s.priceNum}>{credits(perPack(p.ladder, 1))}</Text> credits a pack
+              <Text style={s.muted}>  {dollars(perPack(p.ladder, 1))}</Text>
+            </Text>
+
+            {p.status === "available" ? (
+              <>
+                <View style={s.chips} accessibilityRole="radiogroup" accessibilityLabel="How many packs">
+                  {CHIPS.map((n) => {
+                    const on = qty === n;
+                    const off = n > max;
+                    return (
+                      <Pressable key={n} testID={`qty-${n}`} accessibilityRole="radio" accessibilityState={{ checked: on, disabled: off }} disabled={off}
+                        onPress={() => { haptic.tap(); setQty(n); }} style={[s.chip, on && s.chipOn, off && { opacity: 0.35 }]}>
+                        <Text style={[s.chipQty, on && { color: stage.accentInk }]}>{n} pack{n > 1 ? "s" : ""}</Text>
+                        <Text style={[s.chipEach, on && { color: stage.accentInk }]}>{credits(perPack(p.ladder, n))} each</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <View style={s.stepper}>
+                  <Pressable testID="qty-minus" accessibilityRole="button" accessibilityLabel="One fewer" disabled={qty <= 1}
+                    onPress={() => setQty(qty - 1)} style={[s.step, qty <= 1 && { opacity: 0.35 }]}><Minus size={18} color={stage.text} /></Pressable>
+                  <Text style={s.qty} testID="qty" accessibilityLiveRegion="polite">{qty}</Text>
+                  <Pressable testID="qty-plus" accessibilityRole="button" accessibilityLabel="One more" disabled={qty >= max}
+                    onPress={() => setQty(qty + 1)} style={[s.step, qty >= max && { opacity: 0.35 }]}><Plus size={18} color={stage.text} /></Pressable>
+                </View>
+              </>
+            ) : <StateNote p={p} breakUntil={store.data?.break_until ?? null} />}
+
+            {me && p.status !== "on_break" ? (
+              <Text style={s.muted} testID="set-limit">You have {p.left_for_you} of {p.set_limit} available for {p.set_name}.</Text>
+            ) : !me ? <Text style={s.muted}>Each customer can buy up to {p.set_limit} packs of {p.set_name} during the test run.</Text> : null}
+
+            {store.data && (
+              <Text style={s.cutoff} testID="cutoff">
+                Order by 7:00 PM PT to be in tonight's rip. <Text style={s.mono}>{countdownText(store.data.next_cutoff, now)}</Text>
+              </Text>
+            )}
+            {p.wizards_info_url ? (
+              <Pressable accessibilityRole="link" onPress={() => Linking.openURL(p.wizards_info_url!)} style={s.link} testID="whats-in-a-pack">
+                <Text style={s.linkText}>What's in a pack</Text><ExternalLink size={14} color={stage.accent} />
+              </Pressable>
+            ) : null}
+            <Text style={s.fine}>
+              Your pack stays sealed until tonight's session. We open every pack on camera in queue order between 7 and 8 PM PT.
+              You can cancel for a full credit refund until 7 PM PT.
+            </Text>
+            <ErrorText>{store.error}</ErrorText>
+          </View>
+        )}
+        <Footer onStage />
+      </ScrollView>
+
+      {p && p.status === "available" && (
+        <View style={[s.pinned, { paddingBottom: 12 }]}>
+          <Button testID="buy" label={!me ? "Log in to buy" : balance < total ? `Add credits to buy (${credits(total)})` : `Buy ${qty} · ${credits(total)} credits`}
+            onPress={buy} style={{ width: "100%", maxWidth: 520 }} />
+        </View>
+      )}
+      {confirming && p && (
+        <ConfirmSheet product={p} qty={qty} total={total} suggestLimit={!!limits.data?.suggest_limit}
+          onClose={() => setConfirming(false)} onPlaced={() => { store.reload(); limits.reload(); refresh(); }} bottom={insets.bottom} />
+      )}
+    </Stage>
+  );
+}
+
+function StateNote({ p, breakUntil }: { p: Product; breakUntil: string | null }) {
+  const note: Record<Exclude<Status, "available">, { title: string; body: string; action?: { label: string; to: string } }> = {
+    sold_out: { title: "Sold out", body: `There are no sealed ${p.set_name} packs left.`, action: { label: "See drops", to: "/drops" } },
+    limit_reached: { title: "Limit reached", body: `You have all ${p.set_limit} of your ${p.set_name} packs for this test run.` },
+    upcoming: { title: "Next drop", body: p.drop_starts_at ? `Goes live ${pacific(p.drop_starts_at)} PT.` : "Coming soon.", action: { label: "See drops", to: "/drops" } },
+    ended: { title: "This drop has ended", body: "See Drops for what's next.", action: { label: "See drops", to: "/drops" } },
+    on_break: { title: "You're on a break", body: breakUntil ? `You can buy packs again after ${pacific(breakUntil)} PT.` : "", action: { label: "Spending settings", to: "/account" } },
+  };
+  const n = note[p.status as Exclude<Status, "available">];
+  return (
+    <View style={s.state} testID={`state-${p.status}`}>
+      <Text style={s.stateTitle}>{n.title}</Text>
+      <Text style={s.muted}>{n.body}</Text>
+      {n.action ? <Button kind="ghost" onStage label={n.action.label} onPress={() => router.push(n.action!.to as never)} /> : null}
+    </View>
+  );
+}
+
+function ConfirmSheet({ product, qty, total, suggestLimit, onClose, onPlaced, bottom }:
+  { product: Product; qty: number; total: number; suggestLimit: boolean; onClose: () => void; onPlaced: () => void; bottom: number }) {
+  const [askLimit, setAskLimit] = useState(suggestLimit);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [placed, setPlaced] = useState(false);
+  const place = async () => {
+    setBusy(true); setError(null);
+    try {
+      await api("POST", "/orders", { product_id: product.product_id, quantity: qty });
+      setPlaced(true);
+      onPlaced();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  };
+  return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={s.scrim} onPress={onClose} />
-      <View style={s.sheet} testID="order-sheet">
-        {placed ? (
+      <Pressable style={s.scrim} onPress={onClose} accessibilityLabel="Close" />
+      <View style={[s.sheet, { paddingBottom: 24 + bottom }]} testID="order-sheet" accessibilityViewIsModal>
+        {askLimit ? (
+          <View style={{ gap: 12 }} testID="limit-prompt">
+            <Text style={type.h2}>Set a spending limit first?</Text>
+            <Text style={type.body}>You can set a daily, weekly or monthly limit in Account. It's optional, and you can change it any time.</Text>
+            <View style={s.row}>
+              <Button kind="ghost" label="Not now" testID="limit-not-now" onPress={() => setAskLimit(false)} />
+              <Button label="Set a limit" onPress={() => { onClose(); router.push("/account"); }} />
+            </View>
+          </View>
+        ) : placed ? (
           <View style={{ gap: 12 }}>
-            <Text style={s.h2}>You're in tonight's queue</Text>
-            <Text style={s.body} testID="placed">
-              {qty} {product.name}{qty > 1 ? "s" : ""}, still sealed. Your spot locks at 7pm Pacific, we open it on camera between 7 and 8,
-              and you'll get "You just cracked a pack" by 9.
+            <Text style={type.h2}>You're in tonight's queue</Text>
+            <Text style={type.body} testID="placed">
+              {qty} {product.name}{qty > 1 ? "s" : ""}, still sealed. The queue locks at 7:00 PM PT and we open packs on camera between 7 and 8.
+              We'll email you when your cards and video are in your Vault.
             </Text>
             <Button label="Done" onPress={onClose} />
           </View>
         ) : (
-          <View style={{ gap: 14 }}>
-            <Text style={s.h2}>{product.name}</Text>
-            <View style={s.qtyRow}>
-              {QUANTITIES.map((q) => (
-                <Pressable key={q} testID={`qty-${q}`} onPress={() => { haptic.tap(); setQty(q); }}
-                  style={[s.qty, qty === q && s.qtyOn]}>
-                  <Text style={[s.qtyNum, qty === q && { color: colors.accentInk }]}>{q}</Text>
-                  <Text style={[s.qtyEach, qty === q && { color: colors.accentInk }]}>{dollars(perPack(product.ladder, q))}</Text>
-                </Pressable>
-              ))}
-            </View>
+          <View style={{ gap: 12 }}>
+            <Text style={type.h2}>{product.name}</Text>
             <View style={s.totalRow}>
-              <Text style={s.body}>{qty} pack{qty > 1 ? "s" : ""} · {dollars(each)} each</Text>
+              <Text style={type.body}>{qty} pack{qty > 1 ? "s" : ""} at {credits(total / qty)} each</Text>
               <Text style={s.total} testID="total">{credits(total)} credits</Text>
             </View>
-            {short && <Text style={s.warn}>You have {credits(me?.credits.total)} credits. Add credits in Account.</Text>}
-            <Button testID="place-order" label="Join tonight's queue" onPress={place} busy={busy} disabled={short} />
-            <Text style={s.fine}>Cancel any time before 7pm Pacific for a full credit refund. After the cutoff the queue is locked.</Text>
+            <Text style={type.small}>Credits are used on CrackAPack packs only. Cancel before 7:00 PM PT for a full credit refund.</Text>
+            <Button testID="place-order" label="Confirm order" onPress={place} busy={busy} />
             <ErrorText>{error}</ErrorText>
           </View>
         )}
@@ -152,37 +229,40 @@ function OrderSheet({ product, onClose, onPlaced }: { product: Product | null; o
   );
 }
 
-function useNow(ms: number) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]);
-  return now;
-}
-
 const s = StyleSheet.create({
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", padding: 16 },
-  h1: { color: colors.text, fontSize: 30, fontFamily: font.display },
-  h2: { color: colors.text, fontSize: 22, fontFamily: font.display },
-  sub: { color: colors.muted, marginTop: 2, maxWidth: 240 },
-  balance: { alignItems: "flex-end" },
-  balanceNum: { color: colors.accent, fontSize: 22, fontFamily: font.display },
-  balanceLabel: { color: colors.muted, fontSize: 11 },
-  section: { color: colors.muted, fontFamily: font.bodyBold, textTransform: "uppercase", letterSpacing: 1, fontSize: 12, paddingHorizontal: 16, marginBottom: 8 },
-  product: { flexDirection: "row", gap: 14, alignItems: "center" },
-  pname: { color: colors.text, fontSize: 18, fontFamily: font.display },
-  price: { color: colors.accent, fontSize: 16, fontFamily: font.display },
-  muted: { color: colors.muted, fontFamily: font.body, fontSize: 13 },
-  stock: { color: colors.ok, fontSize: 12, fontFamily: font.bodySemi },
-  how: { color: colors.muted, fontSize: 12, lineHeight: 18, padding: 16, marginTop: 8 },
-  scrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
-  sheet: { backgroundColor: colors.panel, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 36, borderColor: colors.line, borderWidth: 1 },
-  qtyRow: { flexDirection: "row", gap: 8 },
-  qty: { flex: 1, borderRadius: radius, borderWidth: 1, borderColor: colors.line, paddingVertical: 10, alignItems: "center" },
-  qtyOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  qtyNum: { color: colors.text, fontSize: 20, fontFamily: font.display },
-  qtyEach: { color: colors.muted, fontSize: 11 },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  total: { color: colors.text, fontSize: 20, fontFamily: font.display },
-  body: { color: colors.text, fontSize: 15, lineHeight: 21 },
-  warn: { color: colors.accent },
-  fine: { color: colors.muted, fontSize: 12 },
+  head: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingTop: 12, maxWidth: 900, width: "100%", alignSelf: "center" },
+  h1: { fontFamily: font.display, fontSize: 20, color: stage.text, letterSpacing: 0.4 },
+  balance: { alignItems: "flex-end", borderLeftWidth: 3, borderLeftColor: stage.accent, paddingLeft: 10 },
+  balanceNum: { color: stage.text, fontSize: 18, fontFamily: font.monoMedium },
+  balanceLabel: { color: stage.muted, fontSize: 11, fontFamily: font.body },
+  none: { alignItems: "center", gap: 10, padding: 40 },
+  glowWrap: { position: "absolute", top: 60, left: 0, right: 0, alignItems: "center" },
+  glow: { borderRadius: 999, backgroundColor: "rgba(135, 207, 239, 0.10)" },
+  detail: { gap: 12, paddingHorizontal: 16, paddingTop: 8, maxWidth: 520, width: "100%", alignSelf: "center" },
+  title: { fontFamily: font.display, fontSize: 24, lineHeight: 30, color: stage.text, textAlign: "center" },
+  price: { fontFamily: font.body, fontSize: 15, color: stage.muted, textAlign: "center" },
+  priceNum: { fontFamily: font.displaySemi, fontSize: 20, color: stage.text },
+  muted: { fontFamily: font.body, fontSize: 13, lineHeight: 19, color: stage.muted, textAlign: "center" },
+  chips: { flexDirection: "row", gap: 8 },
+  chip: { flex: 1, borderWidth: 1.5, borderColor: stage.line, borderRadius: radii.control, paddingVertical: 10, alignItems: "center", backgroundColor: stage.panel },
+  chipOn: { backgroundColor: stage.accent, borderColor: stage.accent },
+  chipQty: { fontFamily: font.bodyBold, fontSize: 14, color: stage.text },
+  chipEach: { fontFamily: font.mono, fontSize: 12, color: stage.muted, marginTop: 2 },
+  stepper: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 20 },
+  step: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: stage.line, alignItems: "center", justifyContent: "center" },
+  qty: { fontFamily: font.monoMedium, fontSize: 22, color: stage.text, minWidth: 30, textAlign: "center" },
+  cutoff: { fontFamily: font.bodySemi, fontSize: 14, color: stage.text, textAlign: "center" },
+  mono: { fontFamily: font.monoMedium, color: stage.accent },
+  link: { flexDirection: "row", gap: 6, alignItems: "center", alignSelf: "center", minHeight: 44 },
+  linkText: { fontFamily: font.bodySemi, fontSize: 14, color: stage.accent, textDecorationLine: "underline" },
+  fine: { fontFamily: font.body, fontSize: 12, lineHeight: 18, color: stage.muted, textAlign: "center" },
+  state: { gap: 8, alignItems: "center", padding: 16, borderWidth: 1, borderColor: stage.line, borderRadius: radii.panel, backgroundColor: stage.panel },
+  stateTitle: { fontFamily: font.displaySemi, fontSize: 18, color: stage.text },
+  pinned: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 12, backgroundColor: "rgba(10, 16, 26, 0.92)",
+    borderTopWidth: 1, borderTopColor: stage.line, alignItems: "center" },
+  scrim: { flex: 1, backgroundColor: "rgba(10, 16, 26, 0.6)" },
+  sheet: { backgroundColor: palette.ink[100], borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxWidth: 560, width: "100%", alignSelf: "center" },
+  row: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  total: { fontFamily: font.monoMedium, fontSize: 20, color: palette.ink[700] },
 });

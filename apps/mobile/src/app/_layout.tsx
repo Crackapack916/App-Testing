@@ -39,10 +39,10 @@ function Root() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="card/[id]" options={{ presentation: "modal" }} />
+        <Stack.Screen name="add-credits" options={{ presentation: "modal" }} />
       </Stack.Protected>
       <Stack.Protected guard={!!me?.age_verified}>
-        <Stack.Screen name="reveal" options={{ presentation: "fullScreenModal", animation: "fade" }} />
-        <Stack.Screen name="clip" options={{ presentation: "fullScreenModal" }} />
+        <Stack.Screen name="pack/[id]" options={{ presentation: "fullScreenModal" }} />
       </Stack.Protected>
       <Stack.Protected guard={!!me && !me.age_verified}>
         <Stack.Screen name="verify-age" />

@@ -254,8 +254,9 @@ customer.get("/me/packs/:id/video", async (c) => {
      join pack_openings po on po.id = v.pack_opening_id join queue_entries q on q.id = po.queue_entry_id join orders o on o.id = q.order_id
      where v.pack_opening_id = $1 and o.user_id = $2 and o.status = 'fulfilled' and v.status = 'approved'`, [c.req.param("id"), c.get("user").id]);
   if (!v) throw new ApiError("unknown_video", 404);
-  return c.json({ url: await videos.signedUrl(v.pathname, VIDEO_LINK_SECONDS), content_type: v.content_type,
-    poster: v.thumbnail_pathname ? await videos.signedUrl(v.thumbnail_pathname, VIDEO_LINK_SECONDS) : null,
+  const abs = (u: string) => new URL(u, c.req.url).toString();
+  return c.json({ url: abs(await videos.signedUrl(v.pathname, VIDEO_LINK_SECONDS)), content_type: v.content_type,
+    poster: v.thumbnail_pathname ? abs(await videos.signedUrl(v.thumbnail_pathname, VIDEO_LINK_SECONDS)) : null,
     expires_in: VIDEO_LINK_SECONDS });
 });
 
