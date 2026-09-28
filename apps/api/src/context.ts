@@ -1,5 +1,6 @@
 import type pg from "pg";
 import type { PaymentProcessor } from "@crackapack/payments";
+import type { EmailProvider } from "./email";
 
 export type Role = "customer" | "staff" | "admin";
 export type User = { id: string; role: Role; display_name: string | null };
@@ -14,11 +15,12 @@ export interface Services {
   devLogin: boolean;
   /** Emails dev login may make staff. Nobody else can ask for a role. */
   devStaffEmails?: string[];
-  /**
-   * Clerk session tokens, verified locally with the instance's public key (no network call).
-   * The Clerk session token must carry an `email` claim: {"email": "{{user.primary_email_address}}"}.
-   */
-  clerk?: { jwtKey: string; authorizedParties?: string[] };
+  /** Encrypts birthdates at rest (AES-256-GCM). Sign up is refused without it. */
+  dobKey: Buffer | null;
+  /** Customer and staff email. */
+  email: EmailProvider;
+  /** Public site origin for links in emails, e.g. https://crackapack-preview.vercel.app */
+  appUrl: string;
   /** Produces each order's clip from the session recording. */
   clips: ClipService;
   /** Verifies /webhooks/mux. Set when clips are Mux. */
@@ -31,6 +33,9 @@ export interface Services {
 export interface PushService {
   send(userId: string, title: string, body: string, data: Record<string, string>): Promise<void>;
 }
+
+/** What callers pass to createApp; email, dobKey and appUrl have safe defaults for tests. */
+export type ServiceOptions = Omit<Services, "email" | "dobKey" | "appUrl"> & Partial<Pick<Services, "email" | "dobKey" | "appUrl">>;
 
 export type Env = {
   Variables: { db: pg.PoolClient; user: User; services: Services };

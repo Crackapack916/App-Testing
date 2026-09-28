@@ -20,8 +20,8 @@ dev.post("/login", async (c) => {
   if (asked && asked !== "customer" && !staffOk) throw new ApiError("forbidden");
   const role = asked === "staff" && staffOk ? "staff" : null;
   const { rows: [u] } = await db.query(
-    `insert into users (email, display_name, role, age_verified_at, birthdate, state_code)
-     values ($1, $2, coalesce($3, 'customer'), case when $4 then now() end, case when $4 then date '1990-01-01' end, case when $4 then 'CA' end)
+    `insert into users (email, display_name, role, age_verified_at, state_code)
+     values ($1, $2, coalesce($3, 'customer'), case when $4 then now() end, case when $4 then 'CA' end)
      on conflict (email) do update set display_name = coalesce(excluded.display_name, users.display_name)
      returning id, role`, [email, display_name ?? null, role ?? null, verified === true]);
   return c.json({ token: await issueToken(u.id, c.get("services").jwtSecret), user_id: u.id, role: u.role });

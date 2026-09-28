@@ -42,7 +42,8 @@ test("a customer's night: order, get cracked, reveal, vault, ship, search", asyn
   await page.goto("/");
   await setNow(page, BEFORE);
   await page.getByTestId("email").fill("alice@e2e.test");
-  await page.getByTestId("sign-in").click();
+  await page.getByTestId("password").fill("alice password");
+  await page.getByTestId("submit").click();
 
   // Packs is the landing tab: tonight's cutoff, the balance, the set on sale.
   await expect(page.getByTestId("cutoff")).toContainText("Tonight's queue locks in 4h 0m");

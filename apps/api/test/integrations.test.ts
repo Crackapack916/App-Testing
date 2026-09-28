@@ -1,5 +1,4 @@
 import { createHmac } from "node:crypto";
-import { exportSPKI, generateKeyPair, SignJWT } from "jose";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { freshDb, type Db } from "../../../packages/db/test/db";
 import { makeCard, makeProduct } from "../../../packages/db/test/fixtures";
@@ -10,50 +9,6 @@ import type { ClipService } from "../src/context";
 let db: Db;
 beforeEach(async () => { db = await freshDb(); });
 afterEach(async () => { await db.close(); });
-
-describe("Clerk sign in", () => {
-  async function clerkSetup() {
-    const { publicKey, privateKey } = await generateKeyPair("RS256");
-    const pem = await exportSPKI(publicKey);
-    const app = createApp({ pool: db.pool, jwtSecret: "s", push: { send: async () => {} }, devLogin: false, testClock: false,
-      clips: linkClips, clerk: { jwtKey: pem, authorizedParties: ["https://app.crackapack.test"] } });
-    const token = (claims: Record<string, unknown>, opts: { exp?: number; key?: CryptoKey } = {}) =>
-      new SignJWT({ azp: "https://app.crackapack.test", ...claims }).setProtectedHeader({ alg: "RS256", kid: "ins_test" })
-        .setIssuer("https://clerk.crackapack.test").setIssuedAt().setNotBefore(Math.floor(Date.now() / 1000) - 5)
-        .setExpirationTime(opts.exp ?? Math.floor(Date.now() / 1000) + 60).sign(opts.key ?? privateKey);
-    const me = async (t: string) => { const r = await app.request("/me", { headers: { authorization: `Bearer ${t}` } }); return { status: r.status, body: await r.json() as any }; };
-    return { app, token, me };
-  }
-
-  it("creates the customer on first sign in and finds them after", async () => {
-    const { token, me } = await clerkSetup();
-    const first = await me(await token({ sub: "user_abc", email: "Alice@Example.com" }));
-    expect(first.status).toBe(200);
-    expect(first.body).toMatchObject({ role: "customer", age_verified: false });
-    const again = await me(await token({ sub: "user_abc" }));
-    expect(again.body.id).toBe(first.body.id);
-    expect(await db.q("select email, auth_user_id from users")).toEqual([{ email: "alice@example.com", auth_user_id: "user_abc" }]);
-  });
-
-  it("rejects forged, expired and wrong origin tokens, and pilot tokens once Clerk is on", async () => {
-    const { token, me } = await clerkSetup();
-    const other = await generateKeyPair("RS256");
-    expect((await me(await token({ sub: "u", email: "x@x.test" }, { key: other.privateKey }))).status).toBe(401);
-    expect((await me(await token({ sub: "u", email: "x@x.test" }, { exp: Math.floor(Date.now() / 1000) - 60 }))).status).toBe(401);
-    expect((await me(await token({ sub: "u", email: "x@x.test", azp: "https://evil.test" }))).status).toBe(401);
-    const pilot = await new SignJWT({ sub: "00000000-0000-0000-0000-000000000000" }).setProtectedHeader({ alg: "HS256" })
-      .setExpirationTime("1h").sign(new TextEncoder().encode("s"));
-    expect((await me(pilot)).status).toBe(401);
-    expect(await db.q("select * from users")).toEqual([]);
-  });
-
-  it("refuses an email already linked to a different Clerk account", async () => {
-    const { token, me } = await clerkSetup();
-    await me(await token({ sub: "user_1", email: "same@x.test" }));
-    const r = await me(await token({ sub: "user_2", email: "same@x.test" }));
-    expect([r.status, r.body.error]).toEqual([409, "email_in_use"]);
-  });
-});
 
 describe("Mux clips", () => {
   it("cuts the clip from the live recording, converting session time through wall clock time", async () => {

@@ -1,46 +1,109 @@
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
-import { Button, ErrorText, Screen } from "../components/bits";
-import { useSession } from "../lib/session";
-import { ClerkSignIn } from "../components/ClerkSignIn";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Link } from "expo-router";
+import { Button, ErrorText } from "../components/bits";
+import { DobFields } from "../components/DobFields";
+import { api } from "../lib/api";
+import { useSession, type Dob } from "../lib/session";
 import { colors, radius } from "../lib/theme";
 
-export default function SignIn() {
-  const { mode } = useSession();
-  if (mode === "clerk") return <Screen><ClerkSignIn /></Screen>;
-  return <PilotSignIn />;
-}
+type Mode = "login" | "signup" | "forgot";
 
-function PilotSignIn() {
-  const { signIn } = useSession();
+/** Log in with email and password. Date of birth is asked only when creating an account. */
+export default function SignIn() {
+  const { logIn, signUp } = useSession();
+  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [dob, setDob] = useState<Dob>({ month: "", day: "", year: "" });
+  const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
   const submit = async () => {
     setBusy(true); setError(null);
-    try { await signIn(email.trim()); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    try {
+      if (mode === "login") await logIn(email.trim(), password);
+      else if (mode === "signup") await signUp(email.trim(), password, dob);
+      else { await api("POST", "/auth/forgot", { email: email.trim() }); setSent(true); }
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
+  const go = (m: Mode) => { setMode(m); setError(null); setSent(false); };
+  const dobDone = dob.month.length > 0 && dob.day.length > 0 && dob.year.length === 4;
+  const canSubmit = email.includes("@") && (mode === "forgot" || password.length >= (mode === "signup" ? 8 : 1))
+    && (mode !== "signup" || (dobDone && agree));
+
   return (
-    <Screen>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={s.wrap}>
-        <Text style={s.logo}>Crack<Text style={{ color: colors.accent }}>A</Text>Pack</Text>
-        <Text style={s.tag}>Your pack. Opened live on camera tonight.</Text>
-        <View style={{ gap: 12, marginTop: 32 }}>
-          <TextInput testID="email" value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor={colors.muted}
-            autoCapitalize="none" keyboardType="email-address" style={s.input} onSubmitEditing={submit} />
-          <Button testID="sign-in" label="Continue" onPress={submit} busy={busy} disabled={!email.includes("@")} />
-          <Text style={s.note}>Pilot sign in. Test mode only.</Text>
-          <ErrorText>{error}</ErrorText>
+    <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
+      <View style={s.card} testID="auth-card">
+        <Text style={s.logo} accessibilityRole="header">CrackAPack</Text>
+        <Text style={s.h1}>{mode === "login" ? "Log in" : mode === "signup" ? "Create your account" : "Reset your password"}</Text>
+
+        <View style={s.field}>
+          <Text style={s.label} nativeID="email-label">Email</Text>
+          <TextInput testID="email" value={email} onChangeText={setEmail} inputMode="email" keyboardType="email-address"
+            autoCapitalize="none" autoComplete={"email" as never} aria-labelledby="email-label" style={s.input} />
         </View>
-      </KeyboardAvoidingView>
-    </Screen>
+
+        {mode !== "forgot" && (
+          <View style={s.field}>
+            <Text style={s.label} nativeID="password-label">Password</Text>
+            <TextInput testID="password" value={password} onChangeText={setPassword} secureTextEntry
+              autoComplete={(mode === "signup" ? "new-password" : "current-password") as never} aria-labelledby="password-label"
+              style={s.input} onSubmitEditing={() => canSubmit && mode === "login" && submit()} />
+            {mode === "signup" && <Text style={s.hint}>At least 8 characters.</Text>}
+          </View>
+        )}
+
+        {mode === "signup" && (
+          <>
+            <DobFields value={dob} onChange={setDob} />
+            <Pressable testID="agree" onPress={() => setAgree(!agree)} style={s.check} accessibilityRole="checkbox" aria-checked={agree}>
+              <View style={[s.box, agree && s.boxOn]}>{agree && <Text style={s.tick}>✓</Text>}</View>
+              <Text style={s.checkText}>
+                I'm 18 or older and I agree to the <Link href="/policies/terms" style={s.link}>Terms</Link> and <Link href="/policies/privacy" style={s.link}>Privacy Policy</Link>.
+              </Text>
+            </Pressable>
+          </>
+        )}
+
+        {sent
+          ? <Text style={s.body} testID="reset-sent">If that email has an account, a reset link is on its way. It works for one hour.</Text>
+          : <Button testID="submit" label={mode === "login" ? "Log in" : mode === "signup" ? "Create account" : "Email me a link"}
+              onPress={submit} busy={busy} disabled={!canSubmit} />}
+        <ErrorText>{error}</ErrorText>
+
+        <View style={s.switches}>
+          {mode === "login" && <>
+            <Pressable testID="to-signup" onPress={() => go("signup")}><Text style={s.link}>Create an account</Text></Pressable>
+            <Pressable testID="to-forgot" onPress={() => go("forgot")}><Text style={s.link}>Forgot password</Text></Pressable>
+          </>}
+          {mode !== "login" && <Pressable testID="to-login" onPress={() => go("login")}><Text style={s.link}>I have an account</Text></Pressable>}
+        </View>
+      </View>
+    </ScrollView>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, justifyContent: "center", padding: 24, maxWidth: 480, width: "100%", alignSelf: "center" },
-  logo: { color: colors.text, fontSize: 44, fontWeight: "900", textAlign: "center" },
-  tag: { color: colors.muted, textAlign: "center", marginTop: 6 },
-  input: { backgroundColor: colors.panel, color: colors.text, borderColor: colors.line, borderWidth: 1, borderRadius: radius, padding: 14, fontSize: 16 },
-  note: { color: colors.muted, fontSize: 12, textAlign: "center" },
+  // Web: dvh keeps the layout steady when the phone keyboard opens.
+  page: { flexGrow: 1, padding: 16, alignItems: "center", justifyContent: "flex-start", backgroundColor: colors.bg,
+    ...(Platform.OS === "web" ? { minHeight: "100dvh" as never } : null) },
+  card: { width: "100%", maxWidth: 380, gap: 10, paddingTop: 8 },
+  logo: { color: colors.text, fontSize: 22, fontWeight: "900" },
+  h1: { color: colors.text, fontSize: 20, fontWeight: "800", marginBottom: 2 },
+  field: { gap: 4 },
+  label: { color: colors.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1 },
+  hint: { color: colors.muted, fontSize: 12 },
+  input: { minWidth: 0, backgroundColor: colors.panel, color: colors.text, borderColor: colors.line, borderWidth: 1, borderRadius: radius,
+    paddingHorizontal: 12, paddingVertical: 10, fontSize: 16 },
+  check: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
+  box: { width: 22, height: 22, borderRadius: 4, borderWidth: 1, borderColor: colors.muted, alignItems: "center", justifyContent: "center" },
+  boxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  tick: { color: colors.accentInk, fontWeight: "900" },
+  checkText: { flex: 1, color: colors.text, fontSize: 13, lineHeight: 18 },
+  body: { color: colors.text, fontSize: 14 },
+  link: { color: colors.accent, fontWeight: "700" },
+  switches: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
 });

@@ -13,8 +13,9 @@ async function setTime(page: Page, iso: string) {
 test("a full night: lock, film in strict order, log cards, notify", async ({ page }) => {
   await page.goto("/ops/");
   await setTime(page, "2026-10-01T19:02:00-07:00");
-  await page.getByPlaceholder("staff email").fill("ops@e2e.test");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByLabel("Email").fill("ops@e2e.test");
+  await page.getByLabel("Password").fill("ops password");
+  await page.getByRole("button", { name: "Log in" }).click();
 
   // Tonight: provisional queue, then lock.
   const queue = page.getByTestId("queue");
@@ -80,8 +81,9 @@ test("a full night: lock, film in strict order, log cards, notify", async ({ pag
 test("put a set on sale: create, receive a box, turn it on", async ({ page }) => {
   await page.goto("/ops/");
   await setTime(page, "2026-10-02T09:00:00-07:00");
-  await page.getByPlaceholder("staff email").fill("ops@e2e.test");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByLabel("Email").fill("ops@e2e.test");
+  await page.getByLabel("Password").fill("ops password");
+  await page.getByRole("button", { name: "Log in" }).click();
   await expect(page.getByRole("button", { name: /Stock/ })).toBeVisible();
   await page.keyboard.press("k");
   await page.getByTestId("set-search").fill("Edge");
@@ -110,8 +112,9 @@ test("ship a customer's cards: pick list, tracking, mark shipped", async ({ page
 
   await page.goto("/ops/");
   await setTime(page, "2026-10-02T09:00:00-07:00");
-  await page.getByPlaceholder("staff email").fill("ops@e2e.test");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByLabel("Email").fill("ops@e2e.test");
+  await page.getByLabel("Password").fill("ops password");
+  await page.getByRole("button", { name: "Log in" }).click();
   await expect(page.getByRole("button", { name: /Ship/ })).toBeVisible();
   await page.keyboard.press("p");
   const card = page.locator("[data-testid^=shipment-]");

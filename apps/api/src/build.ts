@@ -3,6 +3,8 @@ import { StripeProcessor } from "@crackapack/payments";
 import { createApp } from "./app";
 import { expoPush } from "./push";
 import { linkClips, muxClips } from "./clips";
+import { dobKeyFrom } from "./secrets";
+import { logEmail } from "./email";
 
 /** Builds the API from environment variables. Shared by the Node server and the Vercel entry. */
 export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
@@ -20,8 +22,8 @@ export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
     throw new Error("DEV_LOGIN and TEST_CLOCK are not allowed when CRACKAPACK_ENV=production");
   }
 
-  // Production signs in only through Clerk.
-  if (production && !env.CLERK_JWT_KEY) throw new Error("CLERK_JWT_KEY is required when CRACKAPACK_ENV=production");
+  // Birthdates are stored only encrypted, so production cannot run without the key.
+  if (production && !env.DOB_ENCRYPTION_KEY) throw new Error("DOB_ENCRYPTION_KEY is required when CRACKAPACK_ENV=production");
 
   // Serverless instances should each hold only a few connections (PG_POOL_MAX=3 on Vercel).
   const pool = new pg.Pool({ connectionString: required("DATABASE_URL"), max: Number(env.PG_POOL_MAX ?? 10) });
@@ -41,9 +43,9 @@ export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
         })
       : undefined,
     push,
-    clerk: env.CLERK_JWT_KEY
-      ? { jwtKey: env.CLERK_JWT_KEY, authorizedParties: env.CLERK_AUTHORIZED_PARTIES?.split(",").map((s) => s.trim()).filter(Boolean) }
-      : undefined,
+    dobKey: dobKeyFrom(env.DOB_ENCRYPTION_KEY),
+    email: logEmail(),
+    appUrl: (env.APP_URL ?? "http://localhost:8081").replace(/\/$/, ""),
     clips: env.MUX_TOKEN_ID
       ? muxClips({ tokenId: env.MUX_TOKEN_ID, tokenSecret: required("MUX_TOKEN_SECRET"), liveStreamId: required("MUX_LIVE_STREAM_ID"), webhookSecret: required("MUX_WEBHOOK_SECRET") })
       : linkClips,

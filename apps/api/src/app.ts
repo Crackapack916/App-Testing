@@ -1,15 +1,18 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
-import type { Env, Services } from "./context";
+import type { Env, ServiceOptions, Services } from "./context";
+import { logEmail } from "./email";
 import { toResponse } from "./errors";
 import { customer } from "./routes/customer";
 import { staff } from "./routes/staff";
 import { webhooks } from "./routes/webhooks";
 import { dev } from "./routes/dev";
 import { cards } from "./routes/cards";
+import { auth } from "./routes/auth";
 
-export function createApp(services: Services) {
+export function createApp(options: ServiceOptions) {
+  const services: Services = { email: logEmail(), dobKey: null, appUrl: "http://localhost:8081", ...options };
   const app = new Hono<Env>();
   app.use("*", cors());
   app.use("*", bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: "payload_too_large", message: "Request too large." }, 413) }));
@@ -36,6 +39,7 @@ export function createApp(services: Services) {
   });
 
   app.get("/health", (c) => c.json({ ok: true }));
+  app.route("/auth", auth);
   app.route("/", cards);
   app.route("/", customer);
   app.route("/staff", staff);

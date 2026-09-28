@@ -19,6 +19,7 @@ beforeEach(async () => {
     clips: linkClips,
     devStaffEmails: ["ops@x.test"],
     testClock: true,
+    dobKey: Buffer.alloc(32, 1),
   });
 });
 afterEach(async () => { await db.close(); });
@@ -105,9 +106,11 @@ describe("age gate and limits", () => {
     expect((await call("GET", "/me", { token })).body.age_verified).toBe(false);
     let o = await call("POST", "/orders", { token, at: BEFORE, body: { product_id: p, quantity: 1 } });
     expect([o.status, o.body.error]).toEqual([403, "age_not_verified"]);
-    const young = await call("POST", "/me/profile", { token, at: BEFORE, body: { birthdate: "2012-05-05", state: "CA" } });
+    // An account without a birthdate on file confirms it once.
+    const young = await call("POST", "/auth/confirm-age", { token, at: BEFORE, body: { dob: { month: "5", day: "5", year: "2012" } } });
     expect([young.status, young.body.error]).toEqual([403, "underage"]);
-    await call("POST", "/me/profile", { token, at: BEFORE, body: { birthdate: "1995-05-05", state: "CA" } });
+    expect((await call("POST", "/auth/confirm-age", { token, at: BEFORE, body: { dob: { month: "5", day: "5", year: "1995" } } })).status).toBe(200);
+    expect((await call("POST", "/auth/confirm-age", { token, at: BEFORE, body: { dob: { month: "5", day: "5", year: "1990" } } })).body.error).toBe("birthdate_locked");
     await call("PUT", "/me/limits", { token, at: BEFORE, body: { daily: 1000, monthly: null } });
     expect((await call("POST", "/orders", { token, at: BEFORE, body: { product_id: p, quantity: 1 } })).status).toBe(201);
     o = await call("POST", "/orders", { token, at: BEFORE, body: { product_id: p, quantity: 1 } });

@@ -8,6 +8,7 @@ import { resolve } from "node:path";
 import setup from "../../../packages/db/test/global-setup";
 import { freshDb } from "../../../packages/db/test/db";
 import { makeCard, makeProduct } from "../../../packages/db/test/fixtures";
+import { hashPassword } from "../../api/src/secrets";
 
 await setup();
 const db = await freshDb();
@@ -33,6 +34,8 @@ for (const [i, [name, qty]] of ([["alice", 2], ["bob", 1]] as const).entries()) 
   await db.q("select purchase_credits($1, 10000, gen_random_uuid()::text)", [u.id]);
   await at(`2026-10-01T1${i}:00:00-07:00`, "select place_order($1, $2, $3)", [u.id, product, qty]);
 }
+await db.q("insert into users (email, display_name, role, age_verified_at, password_hash) values ('ops@e2e.test', 'ops', 'staff', now(), $1)",
+  [await hashPassword("ops password")]);
 await db.pool.end();
 
 const child = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {

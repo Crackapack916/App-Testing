@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { SignIn, useAuth } from "@clerk/react";
-import { api, token, setClerkTokenProvider } from "./api";
+import { api, ApiError, token } from "./api";
 import { useAction, useData, useHotkeys } from "./hooks";
 import { Tonight } from "./screens/Tonight";
 import { Session } from "./screens/Session";
@@ -31,20 +30,7 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
-export function App({ clerk = false }: { clerk?: boolean }) {
-  return clerk ? <ClerkApp /> : <PilotApp />;
-}
-
-/** Staff sign in with Clerk; the API still decides who is staff (an admin promotes them). */
-function ClerkApp() {
-  const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
-  useEffect(() => { setClerkTokenProvider(() => getToken()); }, [getToken]);
-  if (!isLoaded) return null;
-  if (!isSignedIn) return <div className="login"><SignIn /></div>;
-  return <Shell onSignOut={() => signOut()} />;
-}
-
-function PilotApp() {
+export function App() {
   const [authed, setAuthed] = useState(!!token.get());
   if (!authed) return <Login onDone={() => setAuthed(true)} />;
   return <Shell onSignOut={() => { token.clear(); setAuthed(false); }} />;
@@ -86,20 +72,30 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   );
 }
 
+/** Staff log in with the same email and password as the site. Only staff and admin accounts get past /staff. */
 function Login({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState("");
-  const { busy, error, run } = useAction();
+  const [password, setPassword] = useState("");
+  const { busy, error, run, setError } = useAction();
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const r = await run(() => api<{ token: string; role: string }>("POST", "/dev/login", { email, role: "staff" }));
-    if (r) { token.set(r.token); onDone(); }
+    await run(async () => {
+      const r = await api<{ token: string }>("POST", "/auth/login", { email, password });
+      token.set(r.token);
+      try { await api("GET", "/staff/tonight"); onDone(); }
+      catch (err) {
+        token.clear();
+        if (err instanceof ApiError && err.code === "forbidden") setError("This account isn't staff. Ask an admin to add you.");
+        else throw err;
+      }
+    });
   };
   return (
     <form className="login" onSubmit={submit}>
       <h1>CrackAPack Ops</h1>
-      <p className="muted">Pilot sign in (test mode only)</p>
-      <input autoFocus type="email" placeholder="staff email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <button className="primary" disabled={busy || !email}>Sign in</button>
+      <label>Email<input autoFocus type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+      <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+      <button className="primary" disabled={busy || !email || !password}>Log in</button>
       {error && <div className="banner error">{error}</div>}
     </form>
   );

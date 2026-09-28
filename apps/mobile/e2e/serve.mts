@@ -9,6 +9,7 @@ import { extname, join, resolve } from "node:path";
 import setup from "../../../packages/db/test/global-setup";
 import { freshDb } from "../../../packages/db/test/db";
 import { makeCard, makeProduct } from "../../../packages/db/test/fixtures";
+import { hashPassword } from "../../api/src/secrets";
 
 const API_PORT = Number(process.env.E2E_API_PORT ?? 8789);
 const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 8790);
@@ -28,16 +29,14 @@ for (const c of cards) {
   await db.q(`update cards set name = $2, legalities = '{"standard":"Legal","modern":"Legal","commander":"Legal"}' where id = $1`, [id, c.name]);
 }
 // The customer, funded the way a completed checkout would be (through the credit ledger).
-const [alice] = await db.q("insert into users (email, display_name, age_verified_at, state_code) values ('alice@e2e.test', 'alice', now(), 'CA') returning id");
+const [alice] = await db.q("insert into users (email, display_name, age_verified_at, password_hash) values ('alice@e2e.test', 'alice', now(), $1) returning id",
+  [await hashPassword("alice password")]);
 await db.q("select record_credit_purchase($1, 5000, 'stripe', 'cs_e2e_seed')", [alice.id]);
-// A brand new customer: funded, but hasn't verified their age yet.
-const [bob] = await db.q("insert into users (email, display_name) values ('bob@e2e.test', 'bob') returning id");
-await db.q("select record_credit_purchase($1, 5000, 'stripe', 'cs_e2e_seed_bob')", [bob.id]);
 await db.pool.end();
 
 const api = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {
   stdio: "inherit",
-  env: { ...process.env, DATABASE_URL: db.url, JWT_SECRET: "e2e", DEV_LOGIN: "1", TEST_CLOCK: "1", PUSH: "log", DEV_STAFF_EMAILS: "ops@e2e.test", PORT: String(API_PORT) },
+  env: { ...process.env, DATABASE_URL: db.url, JWT_SECRET: "e2e", DOB_ENCRYPTION_KEY: Buffer.alloc(32, 3).toString("base64"), DEV_LOGIN: "1", TEST_CLOCK: "1", PUSH: "log", DEV_STAFF_EMAILS: "ops@e2e.test", PORT: String(API_PORT) },
 });
 
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png",

@@ -11,15 +11,26 @@ const order = (u: string, p: string, qty: number, at = BEFORE_CUTOFF) =>
   atTime(db, at, "select place_order($1, $2, $3) as id", [u, p, qty]).then((r) => r[0].id);
 
 describe("age gate", () => {
-  it("verifies 18 and over, refuses under 18, and locks a verified birthdate", async () => {
-    const u = await makeUser(db, { verified: false, credits: 5000 });
+  it("creates accounts only for 18 and over in Pacific time, keeps no plain birthdate, and locks the confirmation", async () => {
+    const reg = (email: string, dob: string, at = T) =>
+      atTime(db, at, "select register_account($1, 'hash', $2, 'cipher', null) as id", [email, dob]).then((r) => r[0].id as string);
+    await expect(reg("young@x.test", "2008-10-02")).rejects.toThrow(/underage/);
+    const u = await reg("ok@x.test", "2008-10-01"); // 18 today
+    expect(await db.one("select birthdate, dob_encrypted, age_verified_at is not null as ok from users where id = $1", [u]))
+      .toEqual({ birthdate: null, dob_encrypted: "cipher", ok: true });
+    await expect(reg("OK@x.test", "1990-01-01")).rejects.toThrow(/email_in_use/);
+    await expect(db.q("update users set birthdate = '1990-01-01' where id = $1", [u])).rejects.toThrow(/users_no_plain_birthdate/);
+    await expect(db.q("update users set age_verified_at = now() - interval '1 day' where id = $1", [u])).rejects.toThrow(/birthdate_locked/);
+    await expect(atTime(db, T, "select set_profile($1, '1990-01-01', 'CA')", [u])).rejects.toThrow(/use_confirm_age/);
+
+    // An older account with no age on file must confirm before ordering.
+    const legacy = await makeUser(db, { verified: false, credits: 5000 });
     const p = await makeProduct(db);
-    await expect(order(u, p, 1)).rejects.toThrow(/age_not_verified/);
-    await expect(atTime(db, T, "select set_profile($1, '2009-01-01', 'CA')", [u])).rejects.toThrow(/underage/);
-    await atTime(db, T, "select set_profile($1, '2008-10-01', 'ca')", [u]); // 18 today
-    expect(await db.one("select state_code, age_verified_at is not null as ok from users where id = $1", [u])).toEqual({ state_code: "CA", ok: true });
-    await expect(atTime(db, T, "select set_profile($1, '1990-01-01', 'CA')", [u])).rejects.toThrow(/birthdate_locked/);
-    await expect(order(u, p, 1)).resolves.toBeTruthy();
+    await expect(order(legacy, p, 1)).rejects.toThrow(/age_not_verified/);
+    await expect(atTime(db, T, "select confirm_age($1, '2009-01-01', 'c')", [legacy])).rejects.toThrow(/underage/);
+    await atTime(db, T, "select confirm_age($1, '1990-01-01', 'c')", [legacy]);
+    await expect(atTime(db, T, "select confirm_age($1, '1991-01-01', 'c')", [legacy])).rejects.toThrow(/birthdate_locked/);
+    await expect(order(legacy, p, 1)).resolves.toBeTruthy();
   });
 });
 

@@ -32,21 +32,15 @@ customer.get("/me", async (c) => {
   const { rows: [acct] } = await c.get("db").query(
     `select coalesce(purchased, 0)::int as purchased, coalesce(earned, 0)::int as earned,
             (select age_verified_at is not null from users where id = $1) as age_verified,
-            (select state_code from users where id = $1) as state,
+            (select email from users where id = $1) as email,
             (select buyback_enabled from system_config) as buyback
      from (select 1) x left join credit_accounts a on a.user_id = $1`, [u.id]);
-  return c.json({ id: u.id, display_name: u.display_name, role: u.role, age_verified: acct.age_verified, state: acct.state,
+  return c.json({ id: u.id, display_name: u.display_name, role: u.role, age_verified: acct.age_verified, email: acct.email,
     credits: { total: acct.purchased + acct.earned, refundable: acct.purchased, earned: acct.earned },
     features: { buyback: acct.buyback } });
 });
 
 // Age gate: birthdate and state (self attested in the pilot).
-customer.post("/me/profile", async (c) => {
-  const { birthdate, state } = await c.req.json<{ birthdate: string; state: string }>();
-  await c.get("db").query("select set_profile($1, $2, $3)", [c.get("user").id, birthdate, state]);
-  return c.json({ ok: true });
-});
-
 customer.get("/me/limits", async (c) => {
   const id = c.get("user").id;
   const { rows: [r] } = await c.get("db").query(

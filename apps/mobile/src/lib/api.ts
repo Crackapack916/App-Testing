@@ -6,7 +6,7 @@ export class ApiError extends Error {
   constructor(public code: string, message: string, public status: number) { super(message); }
 }
 
-// A fresh token per request: Clerk session tokens live about a minute.
+// The session token, read fresh per request.
 let getToken: () => Promise<string | null> = async () => null;
 export const setTokenProvider = (fn: () => Promise<string | null>) => { getToken = fn; };
 

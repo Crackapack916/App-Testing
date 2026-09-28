@@ -9,8 +9,7 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.crackapack.app",
-      "supportsTablet": false,
-      "usesAppleSignIn": true
+      "supportsTablet": false
     },
     "android": {
       "package": "com.crackapack.app",
@@ -27,16 +26,7 @@
     },
     "plugins": [
       "expo-router",
-      "@clerk/expo",
-      "expo-apple-authentication",
-      "expo-secure-store",
       "expo-video",
-      [
-        "expo-notifications",
-        {
-          "color": "#F2B233"
-        }
-      ],
       [
         "expo-splash-screen",
         {
