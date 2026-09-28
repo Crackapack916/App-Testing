@@ -1,7 +1,6 @@
 import pg from "pg";
 import { StripeProcessor } from "@crackapack/payments";
 import { createApp } from "./app";
-import { expoPush } from "./push";
 import { linkClips, muxClips } from "./clips";
 import { dobKeyFrom } from "./secrets";
 import { logEmail } from "./email";
@@ -30,9 +29,6 @@ export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
   // Serverless instances should each hold only a few connections (PG_POOL_MAX=3 on Vercel).
   const pool = new pg.Pool({ connectionString: required("DATABASE_URL"), max: Number(env.PG_POOL_MAX ?? 10) });
   // PUSH=log prints instead of sending (local and e2e runs).
-  const push = env.PUSH === "log"
-    ? { async send(userId: string, title: string, body: string) { console.log(`[push] ${userId}: ${title} / ${body}`); } }
-    : expoPush(pool, fetch, env.EXPO_ACCESS_TOKEN);
 
   const app = createApp({
     pool,
@@ -44,7 +40,6 @@ export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
           livemode: env.STRIPE_LIVEMODE === "true",
         })
       : undefined,
-    push,
     dobKey: dobKeyFrom(env.DOB_ENCRYPTION_KEY),
     cardData: scryfallProvider(),
     videos: env.BLOB_READ_WRITE_TOKEN ? blobStorage(env.BLOB_READ_WRITE_TOKEN) : undefined,

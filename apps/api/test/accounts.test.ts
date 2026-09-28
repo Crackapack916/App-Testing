@@ -12,7 +12,7 @@ let app: ReturnType<typeof createApp>;
 beforeEach(async () => {
   db = await freshDb();
   sent = [];
-  app = createApp({ pool: db.pool, jwtSecret: "s", push: { send: async () => {} }, devLogin: false, testClock: true,
+  app = createApp({ pool: db.pool, jwtSecret: "s", devLogin: false, testClock: true,
     clips: linkClips, dobKey: KEY, email: logEmail(sent), appUrl: "https://app.test" });
 });
 afterEach(async () => { await db.close(); });

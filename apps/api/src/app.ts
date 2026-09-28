@@ -10,6 +10,7 @@ import { webhooks } from "./routes/webhooks";
 import { dev } from "./routes/dev";
 import { cards } from "./routes/cards";
 import { auth } from "./routes/auth";
+import { drops } from "./routes/drops";
 
 export function createApp(options: ServiceOptions) {
   const services: Services = { email: logEmail(), dobKey: null, appUrl: "http://localhost:8081", ...options };
@@ -41,6 +42,7 @@ export function createApp(options: ServiceOptions) {
   app.get("/health", (c) => c.json({ ok: true }));
   app.route("/auth", auth);
   app.route("/", cards);
+  app.route("/", drops);
   app.route("/", customer);
   app.route("/staff", staff);
   app.route("/webhooks", webhooks);

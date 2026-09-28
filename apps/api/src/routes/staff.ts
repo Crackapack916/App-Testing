@@ -299,35 +299,113 @@ staff.post("/orders/:id/clip/retry", async (c) => {
   return c.json({ status: out.status });
 });
 
-staff.get("/batches/:id/orders", async (c) => {
+// Videos and approval (item 11) ---------------------------------------------------------
+
+// Every pack in the batch in queue order, with its video and logging status.
+staff.get("/batches/:id/overview", async (c) => {
   const { rows } = await c.get("db").query(
-    `select o.id, o.quantity, o.status, coalesce(u.display_name, split_part(u.email, '@', 1)) as customer,
-            oc.status as clip_status, oc.clip_ref,
-            (select count(*) from queue_entries q join pack_openings po on po.queue_entry_id = q.id
-             where q.order_id = o.id and po.contents_finalized_at is not null)::int as packs_logged
-     from orders o join users u on u.id = o.user_id left join order_clips oc on oc.order_id = o.id
-     where o.batch_id = $1 and o.status <> 'cancelled' order by o.placed_at`, [c.req.param("id")]);
-  return c.json({ orders: rows });
+    `select q.position, q.order_id, q.pack_index, o.quantity as order_packs, p.set_code, s.name as set_name,
+            coalesce(u.display_name, split_part(u.email, '@', 1)) as customer, o.status as order_status,
+            po.id as pack_id, po.opened_at, po.contents_finalized_at as approved_at,
+            (select count(*) from pack_contents pc where pc.pack_opening_id = po.id and pc.kind = 'card')::int as cards,
+            coalesce(v.status, 'missing') as video_status, v.size_bytes, v.duration_ms, v.sha256, v.recorded_at, v.uploaded_at,
+            (select email from users where id = v.uploaded_by) as uploaded_by
+     from queue_entries q join orders o on o.id = q.order_id join users u on u.id = q.user_id
+     join products p on p.id = q.product_id join mtg_sets s on s.code = p.set_code
+     left join pack_openings po on po.queue_entry_id = q.id and po.status = 'opened'
+     left join pack_videos v on v.pack_opening_id = po.id
+     where q.batch_id = $1 and q.position is not null order by q.position`, [c.req.param("id")]);
+  // A recording whose own timestamp is earlier than the pack before it is out of queue order.
+  let last = 0;
+  const packs = rows.map((r) => {
+    const t = r.recorded_at ? new Date(r.recorded_at).getTime() : null;
+    const out_of_order = t != null && t < last;
+    if (t != null) last = Math.max(last, t);
+    return { ...r, out_of_order };
+  });
+  const { rows: [m] } = await c.get("db").query("select pathname, size_bytes, sha256, uploaded_at from session_masters where batch_id = $1", [c.req.param("id")]);
+  const ready = packs.length > 0 && packs.every((r) => r.pack_id && ["ready", "approved"].includes(r.video_status) && r.approved_at);
+  return c.json({ packs, session_master: m ?? null, ready_to_approve: ready, videos_enabled: !!c.get("services").videos });
 });
 
-// Notifies every order that is ready (clip published and every pack logged).
-staff.post("/batches/:id/notify", async (c) => {
+// The browser asks for a one upload token, then sends the file straight to storage.
+// Paths are fixed by the server: packs/<pack id>.<ext> and masters/<batch id>.<ext>.
+const VIDEO_PATH = /^(packs|thumbs|masters)\/([0-9a-f-]{36})\.(mp4|mov|jpg)$/;
+staff.post("/videos/token", async (c) => {
+  const videos = c.get("services").videos;
+  if (!videos) throw new ApiError("videos_unavailable", 503);
   const db = c.get("db");
-  const push = c.get("services").push;
-  const { rows } = await db.query(
-    `select o.id, o.user_id, o.quantity from orders o
-     where o.batch_id = $1 and o.status = 'queued'
-       and exists (select 1 from order_clips oc where oc.order_id = o.id and oc.status = 'ready')
-       and not exists (select 1 from queue_entries q left join pack_openings po on po.queue_entry_id = q.id
-                       where q.order_id = o.id and po.contents_finalized_at is null)`, [c.req.param("id")]);
-  for (const o of rows) {
-    const { rows: [n] } = await db.query("select notify_order($1, $2) as id", [o.id, c.get("user").id]);
-    // A failed push never blocks the night: the notification is recorded and shows in the app.
-    await push.send(o.user_id, "You just cracked a pack",
-      o.quantity > 1 ? `Your ${o.quantity} packs are in your vault.` : "Your pull is in your vault.",
-      { order_id: o.id, notification_id: n.id, screen: "reveal" }).catch((e) => console.error("push failed", e));
+  const body = await c.req.json();
+  const out = await videos.clientUpload(c.req.raw, body, async (pathname) => {
+    const m = VIDEO_PATH.exec(pathname);
+    if (!m) return false;
+    if (m[1] === "masters") return (await db.query("select 1 from batches where id = $1 and status in ('locked', 'in_session', 'completed')", [m[2]])).rowCount === 1;
+    return (await db.query("select 1 from pack_videos where pack_opening_id = $1 and status = 'uploading'", [m[2]])).rowCount === 1;
+  });
+  return c.json(out);
+});
+
+staff.post("/packs/:id/video/start", async (c) => {
+  await c.get("db").query("select start_pack_video($1, $2)", [c.req.param("id"), c.get("user").id]);
+  return c.json({ ok: true });
+});
+
+staff.post("/packs/:id/video/finish", async (c) => {
+  const b = await c.req.json<{ pathname: string; size: number; sha256: string; duration_ms: number | null; content_type: string;
+    thumbnail?: string | null; recorded_at?: string | null }>();
+  const videos = c.get("services").videos;
+  if (!videos) throw new ApiError("videos_unavailable", 503);
+  const id = c.req.param("id");
+  if (!VIDEO_PATH.test(b.pathname) || !b.pathname.includes(id)) throw new ApiError("forbidden");
+  // Trust storage, not the browser, for the size.
+  const size = await videos.sizeOf(b.pathname);
+  if (size == null) throw new ApiError("video_missing");
+  if (size !== b.size) throw new ApiError("video_size_mismatch");
+  await c.get("db").query("select finish_pack_video($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+    [id, b.pathname, size, b.sha256, b.duration_ms, b.content_type, b.thumbnail ?? null, b.recorded_at ?? null, c.get("user").id]);
+  return c.json({ ok: true });
+});
+
+// Preview for staff, through the same expiring links customers get.
+staff.get("/packs/:id/video", async (c) => {
+  const videos = c.get("services").videos;
+  if (!videos) throw new ApiError("videos_unavailable", 503);
+  const { rows: [v] } = await c.get("db").query("select pathname, content_type, thumbnail_pathname from pack_videos where pack_opening_id = $1 and pathname is not null", [c.req.param("id")]);
+  if (!v) throw new ApiError("unknown_video", 404);
+  return c.json({ url: await videos.signedUrl(v.pathname, 3600), content_type: v.content_type,
+    poster: v.thumbnail_pathname ? await videos.signedUrl(v.thumbnail_pathname, 3600) : null });
+});
+
+staff.post("/batches/:id/session-master", async (c) => {
+  const b = await c.req.json<{ pathname: string; size: number; sha256: string }>();
+  const videos = c.get("services").videos;
+  if (!videos) throw new ApiError("videos_unavailable", 503);
+  if (!b.pathname.startsWith(`masters/${c.req.param("id")}.`)) throw new ApiError("forbidden");
+  const size = await videos.sizeOf(b.pathname);
+  if (size == null) throw new ApiError("video_missing");
+  if (size !== b.size) throw new ApiError("video_size_mismatch");
+  await c.get("db").query("select record_session_master($1, $2, $3, $4, $5)", [c.req.param("id"), b.pathname, size, b.sha256, c.get("user").id]);
+  return c.json({ ok: true });
+});
+
+// The last step: refused until every pack has a ready video and approved contents.
+// Then every order is notified by email, and the Vault shows its dot.
+staff.post("/batches/:id/approve", async (c) => {
+  const db = c.get("db");
+  const id = c.req.param("id");
+  const { rows: orders } = await db.query(
+    `select o.id, o.quantity, u.email, s.name as set_name from orders o join users u on u.id = o.user_id
+     join products p on p.id = o.product_id join mtg_sets s on s.code = p.set_code
+     where o.batch_id = $1 and o.status = 'queued' order by o.purchase_seq`, [id]);
+  const { rows: [r] } = await db.query("select approve_and_notify_batch($1, $2) as n", [id, c.get("user").id]);
+  const email = c.get("services").email;
+  const base = c.get("services").appUrl;
+  for (const o of orders) {
+    // A failed email never blocks the night: the Vault dot still shows it.
+    await email.send({ kind: "pack_cracked", to: o.email, data: { order_id: o.id, packs: o.quantity, set_name: o.set_name, url: `${base}/vault` } })
+      .catch((e) => console.error("email failed", e));
   }
-  return c.json({ notified: rows.length });
+  return c.json({ notified: r.n });
 });
 
 // Shipping ------------------------------------------------------------------------------
@@ -423,6 +501,50 @@ staff.post("/products/:id/active", async (c) => {
   await c.get("db").query("select set_product_active($1, $2, $3)", [c.req.param("id"), active, c.get("user").id]);
   return c.json({ ok: true });
 });
+
+// Set info: Wizards' published pack information and the official pack photo.
+staff.put("/sets/:code", async (c) => {
+  const b = await c.req.json<{ wizards_info_url?: string | null; pack_image_url?: string | null }>();
+  await c.get("db").query("select set_set_info($1, $2, $3)", [c.req.param("code"), b.wizards_info_url ?? null, b.pack_image_url ?? null]);
+  return c.json({ ok: true });
+});
+
+// Per set limit override for one customer, with a reason (logged, append only).
+staff.post("/set-limits", async (c) => {
+  const b = await c.req.json<{ email: string; set_code: string; max_packs: number; reason: string }>();
+  const db = c.get("db");
+  const { rows: [u] } = await db.query("select id from users where lower(email) = lower($1)", [b.email ?? ""]);
+  if (!u) throw new ApiError("unknown_user");
+  await db.query("select set_customer_set_limit($1, $2, $3, $4, $5)", [u.id, b.set_code, b.max_packs, b.reason, c.get("user").id]);
+  return c.json({ ok: true });
+});
+
+staff.get("/set-limits", async (c) => {
+  const { rows } = await c.get("db").query(
+    `select o.id, u.email, o.set_code, o.max_packs, o.reason, a.email as actor, o.created_at
+     from set_limit_overrides o join users u on u.id = o.user_id join users a on a.id = o.actor order by o.id desc limit 100`);
+  return c.json({ overrides: rows, default_limit: (await c.get("db").query("select max_packs_per_set_per_customer as n from system_config")).rows[0].n });
+});
+
+// Drops (item 14) -------------------------------------------------------------------------
+
+staff.get("/drops", async (c) => {
+  const { rows } = await c.get("db").query(
+    `select d.id, d.set_code, s.name as set_name, d.starts_at, d.ends_at, d.packs_allocated, d.per_customer_limit, d.status,
+            case when d.status = 'published' then drop_state(d) end as state, packs_sold_in_drop(d.id) as sold,
+            (select count(*) from drop_reminders r where r.drop_id = d.id and r.unsubscribed_at is null)::int as reminders
+     from drops d join mtg_sets s on s.code = d.set_code order by d.starts_at desc limit 100`);
+  return c.json({ drops: rows });
+});
+
+type DropBody = { set_code: string; starts_at: string; ends_at?: string | null; packs_allocated: number; per_customer_limit?: number | null; status: string };
+const saveDrop = async (c: { get: (k: "db" | "user") => any }, id: string | null, b: DropBody) => {
+  const { rows: [r] } = await c.get("db").query("select save_drop($1, $2, $3, $4, $5, $6, $7, $8) as id",
+    [id, b.set_code, b.starts_at, b.ends_at || null, b.packs_allocated, b.per_customer_limit || null, b.status, c.get("user").id]);
+  return r.id as string;
+};
+staff.post("/drops", async (c) => c.json({ id: await saveDrop(c, null, await c.req.json<DropBody>()) }, 201));
+staff.put("/drops/:id", async (c) => c.json({ id: await saveDrop(c, c.req.param("id"), await c.req.json<DropBody>()) }));
 
 staff.post("/boxes", async (c) => {
   const b = await c.req.json<{ product_id: string; label: string; pack_count: number; cost_cents?: number }>();

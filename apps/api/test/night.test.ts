@@ -3,18 +3,29 @@ import { freshDb, type Db } from "../../../packages/db/test/db";
 import { makeCard, makeProduct } from "../../../packages/db/test/fixtures";
 import { createApp } from "../src/app";
 import { linkClips } from "../src/clips";
+import { logEmail, type EmailMessage } from "../src/email";
+import type { VideoStorage } from "../src/videos";
 
 let db: Db;
 let app: ReturnType<typeof createApp>;
-let pushed: { userId: string; title: string }[];
+let emails: EmailMessage[];
+// Stands in for Vercel Blob: the browser "uploaded" whatever is in `stored`.
+const stored = new Map<string, number>();
+const videos: VideoStorage = {
+  clientUpload: async () => ({ ok: true }),
+  sizeOf: async (p) => stored.get(p) ?? null,
+  signedUrl: async (p, s) => `https://blob.test/${p}?expires=${s}`,
+};
 
 beforeEach(async () => {
   db = await freshDb();
-  pushed = [];
+  emails = [];
+  stored.clear();
   app = createApp({
     pool: db.pool,
     jwtSecret: "test-secret",
-    push: { send: async (userId, title) => { pushed.push({ userId, title }); } },
+    email: logEmail(emails),
+    videos,
     devLogin: true,
     clips: linkClips,
     devStaffEmails: ["ops@x.test"],
@@ -156,8 +167,9 @@ describe("catalog and products", () => {
     expect((await call("GET", "/storefront", { at: BEFORE })).body.products).toEqual([]);
     await call("POST", `/staff/products/${product_id}/active`, { token: staff.token, body: { active: true } });
     const store = (await call("GET", "/storefront", { at: BEFORE })).body.products;
-    expect(store[0]).toMatchObject({ name: "Edge of Eternities Play Booster", available: true, available_packs: 29 });
-    expect(store[0].ladder.map((t: any) => t.per_pack_credits)).toEqual([900, 850, 825, 800, 775]);
+    expect(store[0]).toMatchObject({ name: "Edge of Eternities Play Booster", status: "available", sold_out: false, left_for_you: 6, max_qty: 6 });
+    expect(store[0]).not.toHaveProperty("stock");
+    expect(store[0].ladder.map((t: any) => t.per_pack_credits)).toEqual([1000, 950, 900]);
   });
 
   it("has no big pulls feed (the site never advertises pulls)", async () => {
@@ -176,7 +188,7 @@ describe("a full night over the API", () => {
 
     // Storefront and ordering.
     const store = await call("GET", "/storefront", { at: BEFORE });
-    expect(store.body.products[0]).toMatchObject({ product_id: p, available: true, single_pack_credits: "900" });
+    expect(store.body.products[0]).toMatchObject({ product_id: p, status: "available", left_for_you: 6 });
     const oA = (await call("POST", "/orders", { token: alice.token, at: "2026-10-01T10:00:00-07:00", body: { product_id: p, quantity: 2 } })).body.order_id;
     const oB = (await call("POST", "/orders", { token: bob.token, at: "2026-10-01T11:00:00-07:00", body: { product_id: p, quantity: 1 } })).body.order_id;
     expect((await call("GET", "/me", { token: alice.token })).body.credits.total).toBe(10_000 - 1800);
@@ -209,8 +221,8 @@ describe("a full night over the API", () => {
     const clips = await db.q("select order_id, start_offset_ms::int, end_offset_ms::int, clip_ref from order_clips");
     expect(clips).toEqual([{ order_id: oA, start_offset_ms: 118_000, end_offset_ms: 240_000, clip_ref: "https://stream.test/night.m3u8#t=118.0,240.0" }]);
 
-    // Nobody can be notified before their contents are logged.
-    expect((await call("POST", `/staff/batches/${batchId}/notify`, { token: staff.token, at: DURING(6) })).body.notified).toBe(0);
+    // Nobody is notified before every pack has a video and approved contents.
+    expect((await call("POST", `/staff/batches/${batchId}/approve`, { token: staff.token, at: DURING(6) })).body.error).toBe("videos_not_ready");
 
     // Logging: set scoped collector number lookup, then finalize each pack.
     const found = await call("GET", "/staff/cards/lookup?set=FDN&num=101", { token: staff.token });
@@ -225,23 +237,61 @@ describe("a full night over the API", () => {
       expect((await call("POST", `/staff/packs/${pk.id}/finalize`, { token: staff.token, at: DURING(7) })).body.entries).toBe(2);
     }
 
-    // Alice is ready (clip + contents). Bob's clip closes when the session completes.
-    expect((await call("POST", `/staff/batches/${batchId}/notify`, { token: staff.token, at: DURING(8) })).body.notified).toBe(1);
     await call("POST", `/staff/sessions/${sessionId}/complete`, { token: staff.token, at: DURING(9) });
     // The ended night stays on the ops screen until everyone is notified.
     expect((await call("GET", "/staff/tonight", { token: staff.token, at: DURING(9) })).body.batch).toMatchObject({ id: batchId, status: "completed" });
-    expect((await call("POST", `/staff/batches/${batchId}/notify`, { token: staff.token, at: DURING(9) })).body.notified).toBe(1);
-    expect((await call("GET", "/staff/tonight", { token: staff.token, at: DURING(9) })).body.batch).toBeNull();
-    expect(pushed.map((x) => x.userId)).toEqual([alice.user_id, bob.user_id]);
-    expect(pushed[0].title).toBe("You just cracked a pack");
+    expect((await call("POST", `/staff/batches/${batchId}/approve`, { token: staff.token, at: DURING(9) })).body.error).toBe("videos_not_ready");
 
-    // Customer side: vault, today's pulls, notifications, order history with clip.
+    // Videos: one per pack, straight to storage; the API checks the stored size and the path.
+    const sha = "ab".repeat(32);
+    for (const [i, pk] of logList.entries()) {
+      const pathname = `packs/${pk.id}.mp4`;
+      const finish = (body: object) => call("POST", `/staff/packs/${pk.id}/video/finish`, { token: staff.token, at: DURING(10), body });
+      const meta = { pathname, size: 1000, sha256: sha, duration_ms: 60_000, content_type: "video/mp4", recorded_at: `2026-10-02T02:${10 + i}:00Z` };
+      expect((await finish(meta)).body.error).toBe("video_missing");
+      await call("POST", `/staff/packs/${pk.id}/video/start`, { token: staff.token, at: DURING(10) });
+      stored.set(pathname, 999);
+      expect((await finish(meta)).body.error).toBe("video_size_mismatch");
+      stored.set(pathname, 1000);
+      expect((await finish({ ...meta, pathname: `packs/${logList[(i + 1) % 3].id}.mp4` })).body.error).toBe("forbidden");
+      expect((await finish(meta)).status).toBe(200);
+    }
+    const overview = (await call("GET", `/staff/batches/${batchId}/overview`, { token: staff.token })).body;
+    expect(overview.packs.map((x: any) => [x.position, x.video_status, x.out_of_order])).toEqual([[1, "ready", false], [2, "ready", false], [3, "ready", false]]);
+    expect(overview.ready_to_approve).toBe(true);
+    // Alice can't watch before approval.
+    expect((await call("GET", `/me/packs/${logList[0].id}/video`, { token: alice.token })).status).toBe(404);
+
+    expect((await call("POST", `/staff/batches/${batchId}/approve`, { token: staff.token, at: DURING(11) })).body.notified).toBe(2);
+    expect((await call("GET", "/staff/tonight", { token: staff.token, at: DURING(11) })).body.batch).toBeNull();
+    expect(emails.map((e) => [e.kind, e.to])).toEqual([["pack_cracked", "alice@x.test"], ["pack_cracked", "bob@x.test"]]);
+
+    // Customer side: the Vault dot, Cracked today, the pack in pulled order, and the video link.
+    expect((await call("GET", "/me", { token: alice.token })).body.unseen_cracked).toBe(1);
+    const cracked = (await call("GET", "/me/cracked", { token: alice.token })).body.packs;
+    expect(cracked.map((x: any) => [x.pack_index, x.cards, x.is_new, x.video_status])).toEqual([[1, 2, true, "approved"], [2, 2, true, "approved"]]);
+    const one = (await call("GET", `/me/packs/${logList[0].id}`, { token: alice.token })).body;
+    expect(one.cards.map((x: any) => [x.slot, x.name])).toEqual([[1, "Card 101"], [2, "Card 7"]]);
+    expect((await call("GET", `/me/packs/${logList[0].id}`, { token: bob.token })).status).toBe(404);
+    const link = (await call("GET", `/me/packs/${logList[0].id}/video`, { token: alice.token })).body;
+    expect(link).toMatchObject({ url: `https://blob.test/packs/${logList[0].id}.mp4?expires=3600`, content_type: "video/mp4" });
+    expect((await call("GET", `/me/packs/${logList[0].id}/video`, { token: bob.token })).status).toBe(404);
+    await call("POST", "/me/cracked/seen", { token: alice.token });
+    expect((await call("GET", "/me", { token: alice.token })).body.unseen_cracked).toBe(0);
+
+    // Vault: newest pack first, cards in pulled order.
     const vault = (await call("GET", "/me/vault", { token: alice.token })).body;
     expect(vault.cards.map((c: any) => [c.name, c.qty, c.individual_card_id !== null])).toEqual([
-      ["Card 101", 1, true], ["Card 7", 3, false],
+      ["Card 7", 3, false], ["Card 101", 1, true],
     ]);
     expect(vault.total_market_cents).toBe(4500 + 3 * 8);
-    expect((await call("GET", "/me/pulls", { token: alice.token })).body.pulls).toHaveLength(4);
+    expect(vault.shipping).toEqual({ free_min: 5000, fee: 499 });
+
+    // Credits: one balance and plain activity with a running balance.
+    const cr = (await call("GET", "/me/credits", { token: alice.token })).body;
+    expect(cr).toMatchObject({ available: 10_000 - 1800, pending: 0 });
+    expect(cr.activity.map((a: any) => [a.description, a.amount, a.balance])).toEqual([
+      ["Bought 2 packs FDN", -1800, 8200], ["Added credits", 10_000, 10_000]]);
     const orders = (await call("GET", "/orders", { token: alice.token })).body.orders;
     expect(orders[0]).toMatchObject({ status: "fulfilled", positions: [1, 2], packs_opened: 2, clip_ref: clips[0].clip_ref });
     expect((await call("GET", "/me/notifications", { token: bob.token })).body.notifications).toHaveLength(1);
@@ -257,7 +307,7 @@ describe("a full night over the API", () => {
     expect(q.body).toMatchObject({ total_credits: 4050, stale: false });
     const staleQuote = await call("POST", "/me/buyback/quote", { token: alice.token, at: "2030-01-01T00:00:00Z", body: { items: [{ card_id: rare, finish: "nonfoil" }] } });
     expect(staleQuote.body.stale).toBe(true);
-    const ic = vault.cards[0].individual_card_id;
+    const ic = vault.cards[1].individual_card_id;
     const bb = await call("POST", "/me/buyback", { token: alice.token, body: { items: [{ individual_card_id: ic }], idempotency_key: "k1" } });
     expect(bb.body).toMatchObject({ status: "completed", total_credits: 4050 });
     expect((await call("GET", "/me", { token: alice.token })).body.credits).toEqual({ total: 8200 + 4050, refundable: 8200, earned: 4050 });

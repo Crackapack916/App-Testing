@@ -11,7 +11,6 @@ export interface Services {
   jwtSecret: string;
   /** Payment processor for checkout and webhooks. Optional so staff only deployments still run. */
   payments?: PaymentProcessor;
-  push: PushService;
   /** Enables POST /dev/login. Refused anyway unless the database is in test mode. */
   devLogin: boolean;
   /** Emails dev login may make staff. Nobody else can ask for a role. */
@@ -32,11 +31,6 @@ export interface Services {
   muxWebhookSecret?: string;
   /** Honors the X-Test-Now header. The database ignores it anyway in live mode. */
   testClock: boolean;
-}
-
-/** Sends "You just cracked a pack". Expo push in production; recorded in tests. */
-export interface PushService {
-  send(userId: string, title: string, body: string, data: Record<string, string>): Promise<void>;
 }
 
 /** What callers pass to createApp; email, dobKey and appUrl have safe defaults for tests. */

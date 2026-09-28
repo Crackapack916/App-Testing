@@ -27,7 +27,7 @@ beforeEach(async () => {
     scryfallCalls.push({ url, headers: init.headers as Record<string, string> });
     return url.endsWith("/cards/sld/1638%E2%98%85") ? Response.json(star) : new Response("{}", { status: 404 });
   }) as unknown as typeof fetch;
-  app = createApp({ pool: db.pool, jwtSecret: "s", push: { send: async () => {} }, devLogin: true, devStaffEmails: ["ops@x.test"],
+  app = createApp({ pool: db.pool, jwtSecret: "s", devLogin: true, devStaffEmails: ["ops@x.test"],
     testClock: true, clips: linkClips, cardData: scryfallProvider(fakeScryfall) });
 }, 120_000);
 afterEach(async () => { await db.close(); });

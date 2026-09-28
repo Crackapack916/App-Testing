@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { BUNDLES } from "@crackapack/payments";
-import { requireUser } from "../auth";
+import { optionalUser, requireUser } from "../auth";
 import { ApiError } from "../errors";
 import { IMAGE_SQL, withImages } from "../images";
 import type { Env } from "../context";
@@ -8,16 +8,46 @@ import type { Env } from "../context";
 /** Customer facing routes. Every write goes through a database function. */
 export const customer = new Hono<Env>();
 
-// Public: what can be ordered tonight.
+// Public: the sets on sale, with each one's state for this customer (guests see the defaults).
+customer.use("/storefront", optionalUser());
 customer.get("/storefront", async (c) => {
-  const { rows } = await c.get("db").query(
-    `select s.*, (select json_agg(json_build_object('min_qty', min_qty, 'per_pack_credits', per_pack_credits) order by min_qty)
-                  from price_tiers t where t.product_id = s.product_id) as ladder
-     from storefront s order by s.set_name`);
-  const { rows: [batch] } = await c.get("db").query(
-    "select batch_date::text, cutoff_at, app_now() as now from batch_for_time(app_now())");
+  const db = c.get("db");
+  const user = c.get("user") ?? null;
+  const { rows } = await db.query(
+    `select p.id as product_id, p.set_code, s.name as set_name, p.booster_type, p.name, s.icon_svg_uri, s.wizards_info_url,
+            s.pack_image_url, coalesce(product_available_packs(p.id), 0) as stock,
+            (select json_agg(json_build_object('min_qty', min_qty, 'per_pack_credits', per_pack_credits) order by min_qty)
+             from price_tiers t where t.product_id = p.id) as ladder,
+            d.id as drop_id, d.starts_at as drop_starts_at, d.ends_at as drop_ends_at, d.state as drop_state,
+            greatest(0, d.packs_allocated - packs_sold_in_drop(d.id)) as drop_remaining,
+            case when $1::uuid is null then 0 else packs_held_in_set($1, p.set_code) end as held,
+            case when $1::uuid is null then (cfg()).max_packs_per_set_per_customer else set_limit_for($1, p.set_code) end as set_limit
+     from products p join mtg_sets s on s.code = p.set_code
+     left join lateral (
+       select x.*, drop_state(x) as state from drops x where x.set_code = p.set_code and x.status = 'published'
+       order by (x.ends_at is not null and x.ends_at <= app_now()),
+                case when x.ends_at is not null and x.ends_at <= app_now() then -extract(epoch from x.starts_at) else extract(epoch from x.starts_at) end
+       limit 1) d on true
+     where p.active order by d.starts_at nulls first, s.name`, [user?.id ?? null]);
+  const { rows: [meta] } = await db.query(
+    `select b.batch_date::text, b.cutoff_at, app_now() as now, (cfg()).max_packs_per_order as max_per_order,
+            (select break_until from spend_limits where user_id = $1 and break_until > app_now()) as break_until
+     from batch_for_time(app_now()) b`, [user?.id ?? null]);
+  const products = rows.map((r) => {
+    const left = Math.max(0, r.set_limit - r.held);
+    const room = Math.min(left, r.stock, r.drop_id ? r.drop_remaining : Infinity, meta.max_per_order);
+    // One status per set, first match wins, so the page shows one clear reason.
+    const status = meta.break_until ? "on_break"
+      : r.drop_state === "upcoming" ? "upcoming"
+      : r.drop_state === "ended" ? "ended"
+      : r.stock <= 0 || r.drop_state === "sold_out" ? "sold_out"
+      : left <= 0 ? "limit_reached"
+      : "available";
+    return { ...r, drop_remaining: undefined, stock: undefined, sold_out: r.stock <= 0, left_for_you: left,
+      max_qty: status === "available" ? room : 0, status };
+  });
   // `now` lets the app count down on the server's clock, not the phone's.
-  return c.json({ products: rows, next_cutoff: batch.cutoff_at, batch_date: batch.batch_date, now: batch.now });
+  return c.json({ products, next_cutoff: meta.cutoff_at, batch_date: meta.batch_date, now: meta.now, break_until: meta.break_until });
 });
 
 customer.get("/bundles", (c) => c.json({ bundles: BUNDLES }));
@@ -33,11 +63,12 @@ customer.get("/me", async (c) => {
     `select coalesce(purchased, 0)::int as purchased, coalesce(earned, 0)::int as earned,
             (select age_verified_at is not null from users where id = $1) as age_verified,
             (select email from users where id = $1) as email,
-            (select buyback_enabled from system_config) as buyback
+            (select buyback_enabled from system_config) as buyback,
+            (select count(*) from notifications n where n.user_id = $1 and n.kind = 'cracked' and n.opened_at is null)::int as unseen
      from (select 1) x left join credit_accounts a on a.user_id = $1`, [u.id]);
   return c.json({ id: u.id, display_name: u.display_name, role: u.role, age_verified: acct.age_verified, email: acct.email,
     credits: { total: acct.purchased + acct.earned, refundable: acct.purchased, earned: acct.earned },
-    features: { buyback: acct.buyback } });
+    features: { buyback: acct.buyback }, unseen_cracked: acct.unseen });
 });
 
 // Spending: daily, weekly and monthly limits (each optional) and breaks.
@@ -128,40 +159,124 @@ customer.get("/orders", async (c) => {
   return c.json({ orders: rows });
 });
 
-// Everything held for the customer, with live value.
+// Credits: one balance, anything still processing, and the activity with a running balance.
+const ACTIVITY_SQL = `
+  with grouped as (
+    select min(e.id) as id, min(e.created_at) as at, e.kind, e.ref_type, coalesce(e.ref_id, e.id::text) as ref_id, sum(e.amount)::bigint as amount
+    from credit_entries e where e.user_id = $1
+    group by e.kind, e.ref_type, coalesce(e.ref_id, e.id::text))
+  select g.id, g.at, g.kind, g.amount::int, (sum(g.amount) over (order by g.id))::int as balance,
+         o.quantity, s.name as set_name,
+         (select count(*) from buyback_items bi where g.ref_type = 'buyback' and bi.request_id::text = g.ref_id)::int as cards,
+         (select cd.name from buyback_items bi join cards cd on cd.id = bi.card_id
+          where g.ref_type = 'buyback' and bi.request_id::text = g.ref_id limit 1) as card_name
+  from grouped g
+  left join orders o on g.ref_type = 'order' and o.id::text = g.ref_id
+  left join products p on p.id = o.product_id left join mtg_sets s on s.code = p.set_code
+  order by g.id desc limit 200`;
+
+function describe(r: { kind: string; quantity: number | null; set_name: string | null; cards: number; card_name: string | null }) {
+  const packs = r.quantity === 1 ? "1 pack" : `${r.quantity} packs`;
+  switch (r.kind) {
+    case "purchase": return "Added credits";
+    case "card_refund": return "Refunded to your card";
+    case "pack_order": return `Bought ${packs} ${r.set_name ?? ""}`.trim();
+    case "order_cancel_refund": return `Order cancelled: ${packs} ${r.set_name ?? ""}`.trim();
+    case "buyback": return r.cards === 1 ? `Sold back: ${r.card_name}` : `Sold back: ${r.cards} cards`;
+    case "shipping_fee": return "Shipping fee";
+    default: return "Adjustment";
+  }
+}
+
+customer.get("/me/credits", async (c) => {
+  const db = c.get("db");
+  const id = c.get("user").id;
+  const { rows: [acct] } = await db.query(
+    `select coalesce(a.purchased + a.earned, 0)::int as available,
+            (select coalesce(sum(total_credits), 0)::int from buyback_requests where user_id = $1 and status = 'held') as pending
+     from (select 1) x left join credit_accounts a on a.user_id = $1`, [id]);
+  const { rows } = await db.query(ACTIVITY_SQL, [id]);
+  return c.json({ available: acct.available, pending: acct.pending,
+    activity: rows.map((r) => ({ id: r.id, at: r.at, kind: r.kind, description: describe(r), amount: r.amount, balance: r.balance })) });
+});
+
+// Cracked today: the packs from the customer's latest approved night, newest order first.
+customer.get("/me/cracked", async (c) => {
+  const { rows } = await c.get("db").query(
+    `with last_night as (
+       select o.batch_id from orders o where o.user_id = $1 and o.status = 'fulfilled' order by o.fulfilled_at desc limit 1)
+     select po.id as pack_id, q.order_id, q.pack_index, o.quantity as order_packs, q.position, p.set_code, s.name as set_name,
+            b.batch_date::text, n.opened_at is null as is_new, v.status as video_status,
+            (select count(*) from pack_contents pc where pc.pack_opening_id = po.id and pc.kind = 'card')::int as cards,
+            (select coalesce(json_agg(ci.uris ->> 'small' order by pc.slot), '[]') from pack_contents pc
+             join card_images ci on ci.card_id = pc.card_id where pc.pack_opening_id = po.id and pc.kind = 'card') as thumbs
+     from last_night ln join batches b on b.id = ln.batch_id
+     join orders o on o.batch_id = ln.batch_id and o.user_id = $1 and o.status = 'fulfilled'
+     join queue_entries q on q.order_id = o.id
+     join pack_openings po on po.queue_entry_id = q.id and po.status = 'opened'
+     join products p on p.id = o.product_id join mtg_sets s on s.code = p.set_code
+     left join pack_videos v on v.pack_opening_id = po.id
+     left join lateral (select opened_at from notifications x where x.order_id = o.id and x.kind = 'cracked' order by sent_at desc limit 1) n on true
+     order by o.placed_at desc, q.pack_index`, [c.get("user").id]);
+  return c.json({ packs: rows });
+});
+
+customer.post("/me/cracked/seen", async (c) => {
+  const { rows: [r] } = await c.get("db").query("select mark_cracked_seen($1) as n", [c.get("user").id]);
+  return c.json({ marked: r.n });
+});
+
+// One of the customer's packs: its cards in the order they were pulled.
+customer.get("/me/packs/:id", async (c) => {
+  const db = c.get("db");
+  const { rows: [pack] } = await db.query(
+    `select po.id, q.order_id, q.pack_index, o.quantity as order_packs, p.set_code, s.name as set_name, b.batch_date::text, v.status as video_status
+     from pack_openings po join queue_entries q on q.id = po.queue_entry_id join orders o on o.id = q.order_id
+     join products p on p.id = o.product_id join mtg_sets s on s.code = p.set_code join batches b on b.id = po.batch_id
+     left join pack_videos v on v.pack_opening_id = po.id
+     where po.id = $1 and o.user_id = $2 and o.status = 'fulfilled'`, [c.req.param("id"), c.get("user").id]);
+  if (!pack) throw new ApiError("unknown_pack", 404);
+  const { rows } = await db.query(
+    `select pc.slot, pc.kind, pc.card_id, pc.finish, cd.name, cd.set_code, cd.collector_number, cd.rarity, pr.market_cents::int, pr.price_asof, ${IMAGE_SQL}
+     from pack_contents pc left join cards cd on cd.id = pc.card_id
+     left join card_prices_current pr on pr.card_id = pc.card_id and pr.finish = pc.finish
+     where pc.pack_opening_id = $1 and pc.kind = 'card' order by pc.slot`, [pack.id]);
+  return c.json({ pack, cards: withImages(rows) });
+});
+
+// The pack's video, only for its owner, through a link that expires.
+const VIDEO_LINK_SECONDS = 60 * 60;
+customer.get("/me/packs/:id/video", async (c) => {
+  const videos = c.get("services").videos;
+  if (!videos) throw new ApiError("videos_unavailable", 503);
+  const { rows: [v] } = await c.get("db").query(
+    `select v.pathname, v.content_type, v.thumbnail_pathname from pack_videos v
+     join pack_openings po on po.id = v.pack_opening_id join queue_entries q on q.id = po.queue_entry_id join orders o on o.id = q.order_id
+     where v.pack_opening_id = $1 and o.user_id = $2 and o.status = 'fulfilled' and v.status = 'approved'`, [c.req.param("id"), c.get("user").id]);
+  if (!v) throw new ApiError("unknown_video", 404);
+  return c.json({ url: await videos.signedUrl(v.pathname, VIDEO_LINK_SECONDS), content_type: v.content_type,
+    poster: v.thumbnail_pathname ? await videos.signedUrl(v.thumbnail_pathname, VIDEO_LINK_SECONDS) : null,
+    expires_in: VIDEO_LINK_SECONDS });
+});
+
+// Everything held, in the order received: newest pack first, cards in the order pulled.
 customer.get("/me/vault", async (c) => {
   const { rows } = await c.get("db").query(
     `select h.card_id, h.finish, h.condition, h.qty, h.individual_card_id, h.market_cents::int, h.price_asof,
-            cd.name, cd.set_code, cd.collector_number, cd.rarity, cd.legalities, ${IMAGE_SQL}
-     from vault_holdings h join cards cd on cd.id = h.card_id
-     where h.user_id = $1 order by h.market_cents desc nulls last, cd.name`, [c.get("user").id]);
+            cd.name, cd.set_code, s.name as set_name, cd.collector_number, cd.rarity, cd.released_at::text, cd.legalities,
+            pull.at as received_at, pull.pack_id, pull.slot, ${IMAGE_SQL}
+     from vault_holdings h join cards cd on cd.id = h.card_id join mtg_sets s on s.code = cd.set_code
+     left join lateral (
+       select po.opened_at as at, po.id as pack_id, pc.slot from pack_contents pc join pack_openings po on po.id = pc.pack_opening_id
+       join queue_entries q on q.id = po.queue_entry_id
+       where q.user_id = h.user_id and pc.card_id = h.card_id and pc.finish = h.finish
+         and (h.individual_card_id is null or pc.individual_card_id = h.individual_card_id)
+       order by po.opened_at desc limit 1) pull on true
+     where h.user_id = $1
+     order by pull.at desc nulls last, pull.slot, cd.name`, [c.get("user").id]);
   const total = rows.reduce((s, r) => s + (r.market_cents ?? 0) * r.qty, 0);
-  return c.json({ cards: withImages(rows), total_market_cents: total });
-});
-
-// "Today's pulls": cards from the customer's most recent notified night.
-customer.get("/me/pulls", async (c) => {
-  const { rows } = await c.get("db").query(
-    `with last_night as (
-       select o.batch_id from orders o where o.user_id = $1 and o.status = 'fulfilled'
-       order by o.fulfilled_at desc limit 1)
-     select po.id as pack_opening_id, q.order_id, q.pack_index, pc.slot, pc.finish, pc.individual_card_id,
-            cd.name, cd.set_code, cd.collector_number, cd.rarity, pr.market_cents::int, b.batch_date::text, ${IMAGE_SQL}
-     from last_night ln
-     join batches b on b.id = ln.batch_id
-     join queue_entries q on q.batch_id = ln.batch_id and q.user_id = $1
-     join pack_openings po on po.queue_entry_id = q.id
-     join pack_contents pc on pc.pack_opening_id = po.id
-     join cards cd on cd.id = pc.card_id
-     left join card_prices_current pr on pr.card_id = pc.card_id and pr.finish = pc.finish
-     order by q.position, pc.slot`, [c.get("user").id]);
-  return c.json({ pulls: withImages(rows) });
-});
-
-customer.post("/me/push-token", async (c) => {
-  const { token, platform } = await c.req.json<{ token: string; platform: string }>();
-  await c.get("db").query("select register_push_token($1, $2, $3)", [c.get("user").id, token, platform]);
-  return c.json({ ok: true });
+  const { rows: [cfg] } = await c.get("db").query("select free_ship_min_value_cents::int as free_min, ship_fee_credits::int as fee from system_config");
+  return c.json({ cards: withImages(rows), total_market_cents: total, shipping: cfg });
 });
 
 customer.post("/me/notifications/:id/opened", async (c) => {

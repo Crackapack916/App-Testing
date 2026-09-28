@@ -8,7 +8,7 @@ export type DropEvent = { id: string; setName: string; startsAt: Date; endsAt: D
 // 20261003T020000Z
 const utc = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 // Escape text values: backslash, semicolon, comma, newline.
-const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 // Lines longer than 75 octets are folded with CRLF and a space.
 function fold(line: string) {
   const out: string[] = [];

@@ -11,7 +11,7 @@ let app: ReturnType<typeof createApp>;
 beforeAll(async () => {
   db = await freshDb();
   await importScryfallBulk(db.pool, { file: F("cards.json"), setsFile: F("sets.json") });
-  app = createApp({ pool: db.pool, jwtSecret: "s", push: { send: async () => {} }, devLogin: false, testClock: false, clips: linkClips });
+  app = createApp({ pool: db.pool, jwtSecret: "s", devLogin: false, testClock: false, clips: linkClips });
 }, 120_000);
 afterAll(async () => { await db.close(); });
 

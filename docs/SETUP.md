@@ -87,7 +87,6 @@ One Vercel project, `crackapack-preview`, built from this repo by `scripts/build
 | `CRACKAPACK_ENV` | `preview` |
 | `DEV_LOGIN`, `TEST_CLOCK` | `1` |
 | `DEV_STAFF_EMAILS` | `staff@crackapack.test` |
-| `PUSH` | `log` |
 | `PG_POOL_MAX` | `3` |
 
 The `preview` branch gets every migration, then `packages/db/seed/preview.sql` once (a set on sale, demo cards, and `player@crackapack.test` with $100 of credit). To start over, reset the branch from its parent and apply the seed again.

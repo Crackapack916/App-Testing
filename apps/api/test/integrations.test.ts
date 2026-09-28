@@ -42,7 +42,7 @@ describe("Mux clips", () => {
     expect(verifyMuxSignature(body, undefined, "w")).toBe(false);
   });
 
-  it("holds notifications until Mux reports the clip ready, and recovers from a failed clip", async () => {
+  it("records the clip when Mux reports it ready, and recovers from a failed clip (custody only; notifying waits on pack videos)", async () => {
     let fail = true;
     const requested: string[] = [];
     const pendingClips: ClipService = { name: "mux", async create({ orderId }) {
@@ -50,8 +50,7 @@ describe("Mux clips", () => {
       if (fail) { fail = false; throw new Error("mux_503"); }
       return { status: "pending" };
     } };
-    const pushed: string[] = [];
-    const app = createApp({ pool: db.pool, jwtSecret: "s", push: { send: async (u) => { pushed.push(u); } }, devLogin: true,
+    const app = createApp({ pool: db.pool, jwtSecret: "s", devLogin: true,
       devStaffEmails: ["ops@x.test"], testClock: true, clips: pendingClips, muxWebhookSecret: "whsec" });
     const call = async (method: string, path: string, token?: string, at?: string, body?: unknown, headers: Record<string, string> = {}) => {
       const r = await app.request(path, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(at ? { "x-test-now": at } : {}), ...headers },
@@ -77,12 +76,10 @@ describe("Mux clips", () => {
     await call("PUT", `/staff/packs/${packs[0].id}/cards/1`, staff.token, undefined, { card_id: card });
     await call("POST", `/staff/packs/${packs[0].id}/finalize`, staff.token, "2026-10-01T19:15:00-07:00");
 
-    // First attempt failed: clip is marked failed, nobody is notified.
+    // First attempt failed: clip is marked failed.
     expect((await db.one("select status from order_clips where order_id = $1", [order_id])).status).toBe("failed");
-    expect((await call("POST", `/staff/batches/${batch.id}/notify`, staff.token, "2026-10-01T19:16:00-07:00")).body.notified).toBe(0);
     // Retry from the Notify screen: now pending at Mux.
     expect((await call("POST", `/staff/orders/${order_id}/clip/retry`, staff.token)).body.status).toBe("pending");
-    expect((await call("POST", `/staff/batches/${batch.id}/notify`, staff.token, "2026-10-01T19:17:00-07:00")).body.notified).toBe(0);
 
     // Mux calls back: forged first, then real.
     const event = JSON.stringify({ type: "video.asset.ready", data: { passthrough: order_id, playback_ids: [{ id: "pb123", policy: "public" }] } });
@@ -95,11 +92,9 @@ describe("Mux clips", () => {
     expect((await call("POST", "/webhooks/mux", undefined, undefined, event, { "mux-signature": sign("whsec") })).body.status).toBe("duplicate");
     expect(Number((await db.one("select count(*) from custody_events where event_type = 'clip_generated'")).count)).toBe(1);
 
-    expect((await call("POST", `/staff/batches/${batch.id}/notify`, staff.token, "2026-10-01T19:20:00-07:00")).body.notified).toBe(1);
-    expect(pushed).toEqual([cust.user_id]);
     expect(requested).toEqual([order_id, order_id]);
     const events = (await db.q("select event_type from custody_events where batch_id = $1 order by seq", [batch.id])).map((e) => e.event_type);
     expect(events).toContain("clip_failed");
-    expect(events.indexOf("clip_generated")).toBeLessThan(events.indexOf("customer_notified"));
+    expect(events.indexOf("clip_failed")).toBeLessThan(events.indexOf("clip_generated"));
   });
 });

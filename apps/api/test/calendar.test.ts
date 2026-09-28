@@ -14,7 +14,7 @@ describe("drop calendar file", () => {
     expect(lines).toContain("DTSTAMP:20260928T120000Z");
     expect(lines).toContain("DTSTART:20261003T020000Z");
     expect(lines).toContain("DTEND:20261003T030000Z");
-    expect(lines).toContain("SUMMARY:CrackAPack drop: Foundations\\, Play Booster\; test");
+    expect(lines).toContain("SUMMARY:CrackAPack drop: Foundations\\, Play Booster\\; test");
     expect(ics).toContain("DESCRIPTION:This is when the set goes live on CrackAPack.");
     expect(lines.filter((l) => l === "BEGIN:VEVENT")).toHaveLength(1);
   });
