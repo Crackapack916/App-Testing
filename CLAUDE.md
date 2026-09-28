@@ -40,7 +40,7 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 * `pnpm typecheck` typechecks every package
 * `pnpm --filter @crackapack/db test` runs the database suite (migrations + invariants)
 * `pnpm --filter @crackapack/payments test` runs the payments suite (needs the local Postgres)
-* `pnpm --filter @crackapack/catalog test` runs the MTGJSON import suite against fixtures in MTGJSON's format
+* `pnpm --filter @crackapack/catalog test` runs the Scryfall and MTGJSON import suite against real fixtures
 * `pnpm --filter @crackapack/api test` runs the API suite, including a full night over HTTP
 * `pnpm --filter @crackapack/mobile test:e2e` exports the app for web and runs a customer's whole night in a phone sized browser
 * `pnpm --filter @crackapack/staff test:e2e` runs the Playwright night in a real browser (`SCREENSHOTS=<dir>` saves the key screens)
