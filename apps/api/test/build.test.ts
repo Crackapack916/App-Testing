@@ -18,3 +18,19 @@ describe("production configuration", () => {
     expect(() => appFromEnv({ ...base, MUX_TOKEN_ID: "id" })).toThrow(/MUX_TOKEN_SECRET/);
   });
 });
+
+describe("the deployed bundle", () => {
+  it("bundles into one module that loads (the Vercel function)", async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    // @ts-expect-error plain JS build helper
+    const { bundleApi } = await import("../../../scripts/bundle-api.mjs");
+    const out = join(mkdtempSync(join(tmpdir(), "bundle-")), "index.mjs");
+    await bundleApi(out);
+    process.env.DATABASE_URL ??= "postgres://unused@127.0.0.1:1/x";
+    process.env.JWT_SECRET ??= "s";
+    const mod = await import(out);
+    expect(typeof mod.default).toBe("function");
+  }, 120_000);
+});

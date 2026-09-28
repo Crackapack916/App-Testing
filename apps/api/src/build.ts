@@ -5,7 +5,7 @@ import { expoPush } from "./push";
 import { linkClips, muxClips } from "./clips";
 import { dobKeyFrom } from "./secrets";
 import { logEmail } from "./email";
-import { scryfallProvider } from "@crackapack/catalog";
+import { scryfallProvider } from "@crackapack/catalog/lookup";
 
 /** Builds the API from environment variables. Shared by the Node server and the Vercel entry. */
 export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {

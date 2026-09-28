@@ -4,8 +4,6 @@
  * rate limits (10 per second for lookups; bulk files are served from a separate host).
  * Card data is imported in bulk daily; nothing here is called per keystroke.
  */
-import { Readable } from "node:stream";
-import { createRequire } from "node:module";
 
 export const SCRYFALL_API = "https://api.scryfall.com";
 export const USER_AGENT = "CrackAPack/0.1 (crackapack.business@gmail.com)";
@@ -103,14 +101,3 @@ export function scryfallClient(fetchImpl: typeof fetch = fetch, base = SCRYFALL_
   };
 }
 
-// stream-json is CommonJS.
-const require = createRequire(import.meta.url);
-const { chain } = require("stream-chain");
-const { parser } = require("stream-json");
-const { streamArray } = require("stream-json/streamers/StreamArray");
-
-/** Streams a bulk file (a top level JSON array) one card at a time. */
-export async function* streamBulk(body: Readable): AsyncGenerator<ScryfallCard> {
-  const pipeline = chain([body, parser(), streamArray()]);
-  for await (const { value } of pipeline) yield value as ScryfallCard;
-}

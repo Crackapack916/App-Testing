@@ -6,26 +6,9 @@
 import { Readable } from "node:stream";
 import { createReadStream } from "node:fs";
 import type pg from "pg";
-import { mapScryfallCard, scryfallClient, streamBulk, type ScryfallRow } from "./scryfall";
-
-export type LookupResult = ScryfallRow;
-
-export interface CardDataProvider {
-  readonly name: string;
-  /** One printing by set code and collector number, or null. Used by logging when our table has no row. */
-  lookup(setCode: string, collectorNumber: string): Promise<LookupResult | null>;
-}
-
-export function scryfallProvider(fetchImpl: typeof fetch = fetch, base?: string): CardDataProvider {
-  const client = scryfallClient(fetchImpl, base);
-  return {
-    name: "scryfall",
-    async lookup(set, number) {
-      const c = await client.cardBySetNumber(set, number);
-      return c ? mapScryfallCard(c) : null;
-    },
-  };
-}
+import { mapScryfallCard, scryfallClient, type ScryfallRow } from "./scryfall";
+import { streamBulk } from "./scryfall-bulk";
+export { scryfallProvider, type CardDataProvider, type LookupResult } from "./lookup";
 
 const BATCH = 2000;
 

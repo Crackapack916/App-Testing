@@ -1,7 +1,7 @@
 import type pg from "pg";
 import type { PaymentProcessor } from "@crackapack/payments";
 import type { EmailProvider } from "./email";
-import type { CardDataProvider } from "@crackapack/catalog";
+import type { CardDataProvider } from "@crackapack/catalog/lookup";
 
 export type Role = "customer" | "staff" | "admin";
 export type User = { id: string; role: Role; display_name: string | null };

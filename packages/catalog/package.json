@@ -23,6 +23,7 @@
   },
   "exports": {
     ".": "./src/provider.ts",
+    "./lookup": "./src/lookup.ts",
     "./scryfall": "./src/scryfall.ts"
   }
 }

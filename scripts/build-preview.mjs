@@ -9,7 +9,7 @@ import { execSync } from "node:child_process";
 import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { build } from "esbuild";
+import { bundleApi } from "./bundle-api.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const out = join(root, ".vercel/output");
@@ -33,25 +33,7 @@ cpSync(join(root, "apps/staff/dist"), join(out, "static/ops"), { recursive: true
 // API function: the Hono app mounted under /api.
 const fn = join(out, "functions/api.func");
 mkdirSync(fn, { recursive: true });
-await build({
-  stdin: {
-    contents: `
-      import { Hono } from "hono";
-      import { handle } from "@hono/node-server/vercel";
-      import { appFromEnv } from "./src/build";
-      export default handle(new Hono().route("/api", appFromEnv()));`,
-    resolveDir: join(root, "apps/api"),
-    loader: "ts",
-  },
-  bundle: true,
-  platform: "node",
-  target: "node22",
-  format: "esm",
-  outfile: join(fn, "index.mjs"),
-  // pg loads pg-native only when asked; CommonJS dependencies need require inside an ES module.
-  external: ["pg-native"],
-  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
-});
+await bundleApi(join(fn, "index.mjs"));
 writeFileSync(join(fn, ".vc-config.json"), JSON.stringify({ runtime: "nodejs22.x", handler: "index.mjs", launcherType: "Nodejs", shouldAddHelpers: false }));
 
 // Routes: API first, then real files, then each app's single page fallback.
