@@ -1,44 +1,31 @@
-import { useEffect } from "react";
-import { Platform, StyleSheet } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Easing, Platform, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { DeviceMotion } from "expo-sensors";
-import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
+import { useReducedMotion } from "../lib/motion";
 import { palette } from "../lib/theme";
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
 /**
- * Holographic foil, drawn in the card frame only (never over the card image). Colors come
- * from the palette's light sky and blue steps. Respects reduced motion.
- * Holographic foil overlay. A rainbow layer and a white sheen band sweep across the card;
- * on devices, tilting the phone shifts the sheen the way a real foil catches light.
- * All motion runs on the UI thread, so it stays smooth on mid range phones.
+ * Holographic foil, drawn in the card frame only (never over the card image, so the
+ * copyright and artist line stay as Scryfall serves them). Colors come from the palette's
+ * sky and blue steps. A slow sheen sweeps across; still when reduced motion is on.
  */
 export function FoilShimmer({ width, intensity = 1 }: { width: number; intensity?: number }) {
   const reduce = useReducedMotion();
-  const sweep = useSharedValue(0.5);
-  const tilt = useSharedValue(0);
-
+  const sweep = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
     if (reduce) return;
-    sweep.value = withRepeat(withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.quad) }), -1, true);
-    if (Platform.OS === "web") return;
-    DeviceMotion.setUpdateInterval(50);
-    const sub = DeviceMotion.addListener((m) => {
-      const g = m.rotation?.gamma ?? 0; // left/right tilt, radians
-      tilt.value = withTiming(Math.max(-1, Math.min(1, g / 0.6)), { duration: 80 });
-    });
-    return () => sub.remove();
-  }, [sweep, tilt, reduce]);
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(sweep, { toValue: 1, duration: 2600, easing: Easing.inOut(Easing.quad), useNativeDriver: Platform.OS !== "web" }),
+      Animated.timing(sweep, { toValue: 0, duration: 2600, easing: Easing.inOut(Easing.quad), useNativeDriver: Platform.OS !== "web" }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [sweep, reduce]);
 
-  const rainbow = useAnimatedStyle(() => ({
-    opacity: 0.85 * intensity,
-    transform: [{ translateX: (sweep.value - 0.5) * width * 0.6 + tilt.value * width * 0.3 }],
-  }));
-  const sheen = useAnimatedStyle(() => ({
-    transform: [{ translateX: (sweep.value * 2 - 1) * width * 1.2 + tilt.value * width * 0.5 }, { rotate: "20deg" }],
-  }));
-
+  const rainbow = { opacity: 0.85 * intensity, transform: [{ translateX: sweep.interpolate({ inputRange: [0, 1], outputRange: [-width * 0.3, width * 0.3] }) }] };
+  const sheen = { transform: [{ translateX: sweep.interpolate({ inputRange: [0, 1], outputRange: [-width * 1.2, width * 1.2] }) }, { rotate: "20deg" }] };
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: "hidden" }]}>
       <AnimatedGradient

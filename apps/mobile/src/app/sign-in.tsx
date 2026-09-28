@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text, TextInput } from "../components/Text";
 import { Link } from "expo-router";
-import { Check } from "lucide-react-native";
+import { Check } from "../components/icons";
 import { Button, ErrorText, Footer } from "../components/bits";
 import { DobFields } from "../components/DobFields";
 import { api } from "../lib/api";
@@ -107,6 +107,6 @@ const s = StyleSheet.create({
   tick: { color: colors.accentInk, fontFamily: font.display },
   checkText: { flex: 1, color: colors.text, fontSize: 13, lineHeight: 18 },
   body: { color: colors.text, fontSize: 14 },
-  link: { color: colors.accent, fontFamily: font.bodyBold },
+  link: { color: colors.link, fontFamily: font.bodyBold, textDecorationLine: "underline" },
   switches: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
 });

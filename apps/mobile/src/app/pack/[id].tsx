@@ -1,7 +1,7 @@
 import { createElement, useEffect, useState } from "react";
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { X } from "lucide-react-native";
+import { X } from "../../components/icons";
 import { Text } from "../../components/Text";
 import { ErrorText, Footer, Stage, SUPPORT_EMAIL } from "../../components/bits";
 import { CardImage } from "../../components/CardImage";

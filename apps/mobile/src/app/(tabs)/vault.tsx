@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
-import { Check, LayoutGrid, List, Play } from "lucide-react-native";
+import { Check, LayoutGrid, List } from "../../components/icons";
 import { Image } from "expo-image";
 import { Text, TextInput } from "../../components/Text";
 import { SignInPrompt } from "../../components/SignInPrompt";
@@ -12,7 +12,6 @@ import { api } from "../../lib/api";
 import { useApi } from "../../lib/useApi";
 import { useSession } from "../../lib/session";
 import { credits, dollars } from "../../lib/format";
-import { haptic } from "../../lib/feedback";
 import { colors, font, palette, radii, rarityRank, type } from "../../lib/theme";
 
 type Holding = { card_id: string; finish: string; condition: string; qty: number; individual_card_id: string | null; market_cents: number | null;
@@ -92,7 +91,6 @@ function VaultScreen() {
 
   const chosen = all.filter((h) => selected[keyOf(h)]).map((h) => ({ h, qty: selected[keyOf(h)] }));
   const toggle = (h: Holding) => {
-    haptic.tap();
     setSelected((s) => { const k = keyOf(h); const n = { ...s }; if (n[k]) delete n[k]; else n[k] = h.qty; return n; });
   };
   const done = () => { setSelected({}); setSelecting(false); setAction(null); vault.reload(); };
@@ -176,7 +174,7 @@ function VaultScreen() {
                   const press = () => (selecting ? toggle(c) : setDetail(c));
                   return view === "grid" ? (
                     <Pressable key={keyOf(c)} onPress={press} style={[{ width: tile }, on && s.on]} testID={`holding-${c.set_code}-${c.collector_number}`}
-                      accessibilityRole={selecting ? "checkbox" : "button"} accessibilityState={selecting ? { checked: on } : undefined}>
+                      accessibilityRole={selecting ? "checkbox" : "button"} accessibilityState={selecting ? { checked: on } : undefined} aria-checked={selecting ? on : undefined}>
                       <CardImage card={{ ...c, image_url: c.image_url }} width={tile} />
                       <View style={s.under}>
                         <Text style={s.price}>{dollars(c.market_cents)}</Text>
@@ -187,7 +185,7 @@ function VaultScreen() {
                     </Pressable>
                   ) : (
                     <Pressable key={keyOf(c)} onPress={press} style={[s.listRow, on && s.on]} testID={`holding-${c.set_code}-${c.collector_number}`}
-                      accessibilityRole={selecting ? "checkbox" : "button"} accessibilityState={selecting ? { checked: on } : undefined}>
+                      accessibilityRole={selecting ? "checkbox" : "button"} accessibilityState={selecting ? { checked: on } : undefined} aria-checked={selecting ? on : undefined}>
                       <CardImage card={{ ...c, image_url: c.image_small ?? c.image_url }} width={52} />
                       <View style={{ flex: 1, gap: 3 }}>
                         <Text style={s.name}>{c.name}{c.qty > 1 ? `  x${c.qty}` : ""}</Text>

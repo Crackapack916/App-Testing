@@ -168,7 +168,7 @@ const s = StyleSheet.create({
   filters: { gap: 8, paddingVertical: 4 },
   label: { color: colors.muted, fontSize: 12, width: 56 },
   small: { minWidth: 0, backgroundColor: colors.panel, color: colors.text, borderColor: colors.line, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14 },
-  link: { color: colors.accent, fontFamily: font.bodyBold },
+  link: { color: colors.link, fontFamily: font.bodyBold, textDecorationLine: "underline" },
   name: { color: colors.text, fontFamily: font.bodyBold, fontSize: 14 },
   meta: { flexDirection: "row", gap: 4, alignItems: "center" },
   icon: { width: 14, height: 14 },

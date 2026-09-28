@@ -1,3 +1,4 @@
+import { View } from "react-native";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import { Fraunces_600SemiBold, Fraunces_700Bold, Fraunces_800ExtraBold } from "@expo-google-fonts/fraunces";
@@ -5,21 +6,20 @@ import { InstrumentSans_400Regular, InstrumentSans_500Medium, InstrumentSans_600
 import { IBMPlexMono_400Regular, IBMPlexMono_500Medium } from "@expo-google-fonts/ibm-plex-mono";
 import "../global.css";
 import { StatusBar } from "expo-status-bar";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SessionProvider, useSession } from "../lib/session";
 import { colors } from "../lib/theme";
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <SafeAreaProvider>
         <SessionProvider>
           <StatusBar style="dark" />
           <Root />
         </SessionProvider>
       </SafeAreaProvider>
-    </GestureHandlerRootView>
+    </View>
   );
 }
 
@@ -30,7 +30,10 @@ function Root() {
     InstrumentSans_400Regular, InstrumentSans_500Medium, InstrumentSans_600SemiBold, InstrumentSans_700Bold,
     IBMPlexMono_400Regular, IBMPlexMono_500Medium });
 
-  if (!ready || (!fontsLoaded && !fontError)) return null;
+  // Render at once: every font has a fallback stack, and the web fonts swap in when loaded.
+  // Blocking on them left the page blank for seconds on a slow phone.
+  void fontsLoaded; void fontError;
+  if (!ready) return null;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       {/* Guests can browse (Search and Drops must work without an account); a signed in

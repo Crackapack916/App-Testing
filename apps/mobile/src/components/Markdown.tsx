@@ -23,7 +23,7 @@ export function Markdown({ md }: { md: string }) {
               {b.split("\n").map((line, j) => {
                 const m = /^(\d+)\. (.*)$/.exec(line);
                 return (
-                  <View key={j} style={{ flexDirection: "row", gap: 8 }}>
+                  <View key={j} style={{ flexDirection: "row", gap: 8 }} role="listitem">
                     <Text style={[type.body, { fontFamily: type.mono.fontFamily, minWidth: 18 }]}>{m?.[1]}.</Text>
                     <Text style={[type.body, { flex: 1 }]}>{m?.[2] ?? line}</Text>
                   </View>

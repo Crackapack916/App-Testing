@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import * as Linking from "expo-linking";
-import { X } from "lucide-react-native";
+import { X } from "../components/icons";
 import { Text } from "../components/Text";
 import { Button, ErrorText, Footer, Screen, Title } from "../components/bits";
 import { RATE_SENTENCE } from "../components/Credits";
@@ -47,7 +47,7 @@ export default function AddCredits() {
               {bundles.data?.bundles.map((b) => {
                 const on = choice === b.key;
                 return (
-                  <Pressable key={b.key} testID={`bundle-${b.key}`} onPress={() => setChoice(b.key)} accessibilityRole="radio" accessibilityState={{ checked: on }}
+                  <Pressable key={b.key} testID={`bundle-${b.key}`} onPress={() => setChoice(b.key)} accessibilityRole="radio" accessibilityState={{ checked: on }} aria-checked={on}
                     style={[s.bundle, on && s.bundleOn]}>
                     <View style={{ flex: 1 }}>
                       <Text style={s.num}>{credits(b.credits)} credits</Text>

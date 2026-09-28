@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
-import { BellRing, CalendarPlus, Check } from "lucide-react-native";
+import { BellRing, CalendarPlus, Check } from "../../components/icons";
 import { Text } from "../../components/Text";
 import { Button, ErrorText, Footer, Screen, Title } from "../../components/bits";
 import { Carousel } from "../../components/Carousel";
@@ -92,7 +92,7 @@ function DropCard({ d, state, now, reload }: { d: Drop; state: Drop["state"]; no
                 <CalendarPlus size={16} color={colors.link} /><Text style={s.actionText}>Google Calendar</Text>
               </Pressable>
             )}
-            <Pressable accessibilityRole="switch" accessibilityState={{ checked: d.reminded, busy }} style={s.action} onPress={remind} testID="remind">
+            <Pressable accessibilityRole="switch" accessibilityState={{ checked: d.reminded, busy }} aria-checked={d.reminded} style={s.action} onPress={remind} testID="remind">
               {d.reminded ? <Check size={16} color={colors.ok} /> : <BellRing size={16} color={colors.link} />}
               <Text style={s.actionText}>{d.reminded ? "Reminder on: we'll email you an hour before" : "Email me a reminder"}</Text>
             </Pressable>

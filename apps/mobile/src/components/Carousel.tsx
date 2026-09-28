@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { Extrapolation, interpolate, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming,
-  type SharedValue } from "react-native-reanimated";
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import { Animated, PanResponder, Platform, Pressable, StyleSheet, View } from "react-native";
+import { useReducedMotion } from "../lib/motion";
+import { ChevronLeft, ChevronRight } from "./icons";
 import { colors, palette, stage } from "../lib/theme";
 
 type Props<T> = {
@@ -21,7 +19,7 @@ type Props<T> = {
   testID?: string;
 };
 
-const SPRING = { damping: 18, stiffness: 170, mass: 0.9 };
+const SPRING = { damping: 18, stiffness: 170, mass: 0.9, useNativeDriver: Platform.OS !== "web" };
 
 /**
  * The pack picker (item 7): drag or swipe with momentum and an elastic snap to the center.
@@ -33,13 +31,14 @@ export function Carousel<T>({ items, keyOf, labelOf, render, itemWidth, height, 
   const reduced = useReducedMotion();
   const [index, setIndex] = useState(controlled ?? 0);
   const step = itemWidth * 0.72;
-  const pos = useSharedValue(index);   // position in items, fractional while dragging
-  const start = useSharedValue(0);
+  const pos = useRef(new Animated.Value(index)).current;   // position in items, fractional while dragging
+  const at = useRef(index);
   const last = items.length - 1;
 
   const settle = useCallback((i: number) => {
     const next = Math.max(0, Math.min(last, i));
-    pos.value = reduced ? withTiming(next, { duration: 0 }) : withSpring(next, SPRING);
+    at.current = next;
+    if (reduced) pos.setValue(next); else Animated.spring(pos, { toValue: next, ...SPRING }).start();
     setIndex(next);
     onIndexChange?.(next);
   }, [last, reduced, onIndexChange, pos]);
@@ -47,18 +46,24 @@ export function Carousel<T>({ items, keyOf, labelOf, render, itemWidth, height, 
   useEffect(() => { if (controlled != null && controlled !== index) settle(controlled); }, [controlled]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (index > last && last >= 0) settle(last); }, [last]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pan = Gesture.Pan().activeOffsetX([-8, 8]).failOffsetY([-14, 14])
-    .onBegin(() => { start.value = pos.value; })
-    .onUpdate((e) => {
-      const raw = start.value - e.translationX / step;
-      // Elastic past either end.
-      pos.value = raw < 0 ? raw * 0.3 : raw > last ? last + (raw - last) * 0.3 : raw;
-    })
-    .onEnd((e) => {
-      // Momentum: a quick flick travels further, then snaps.
-      const projected = pos.value - (e.velocityX / step) * 0.18;
-      runOnJS(settle)(Math.round(projected));
-    });
+  // Drag with an elastic edge; a quick flick travels further, then snaps to the center.
+  const settleRef = useRef(settle);
+  settleRef.current = settle;
+  const pan = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+    onPanResponderGrant: () => pos.stopAnimation(),
+    onPanResponderMove: (_, g) => {
+      const raw = at.current - g.dx / stepRef.current;
+      const end = lastRef.current;
+      pos.setValue(raw < 0 ? raw * 0.3 : raw > end ? end + (raw - end) * 0.3 : raw);
+    },
+    onPanResponderRelease: (_, g) => settleRef.current(Math.round(at.current - g.dx / stepRef.current - g.vx * 0.9)),
+    onPanResponderTerminate: () => settleRef.current(at.current),
+  })).current;
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  const lastRef = useRef(last);
+  lastRef.current = last;
 
   // Left and right keys when the carousel has focus (web).
   const ref = useRef<View>(null);
@@ -78,16 +83,14 @@ export function Carousel<T>({ items, keyOf, labelOf, render, itemWidth, height, 
   return (
     <View ref={ref} testID={testID} style={{ height, justifyContent: "center" }} focusable
       role="region" aria-roledescription="carousel" aria-label={label}>
-      <GestureDetector gesture={pan}>
-        <View style={[StyleSheet.absoluteFill, s.track]}>
+      <View style={[StyleSheet.absoluteFill, s.track]} {...pan.panHandlers}>
           {items.map((item, i) => (
             <Slide key={keyOf(item)} i={i} pos={pos} step={step} width={itemWidth} height={height} reduced={reduced}
               label={`${i + 1} of ${items.length}: ${labelOf(item)}`} onPress={() => settle(i)} active={i === index}>
               {render(item, i === index)}
             </Slide>
           ))}
-        </View>
-      </GestureDetector>
+      </View>
       {items.length > 1 && (
         <>
           <Pressable accessibilityRole="button" accessibilityLabel="Previous" onPress={() => settle(index - 1)} disabled={index === 0}
@@ -105,22 +108,19 @@ export function Carousel<T>({ items, keyOf, labelOf, render, itemWidth, height, 
 }
 
 function Slide({ i, pos, step, width, height, reduced, label, onPress, active, children }:
-  { i: number; pos: SharedValue<number>; step: number; width: number; height: number; reduced: boolean; label: string;
+  { i: number; pos: Animated.Value; step: number; width: number; height: number; reduced: boolean; label: string;
     onPress: () => void; active: boolean; children: ReactNode }) {
-  const style = useAnimatedStyle(() => {
-    const d = i - pos.value;
-    const ad = Math.abs(d);
-    return {
-      zIndex: Math.round(100 - ad * 10),
-      opacity: interpolate(ad, [0, 1, 2.2], [1, 0.55, 0], Extrapolation.CLAMP),
-      transform: [
-        { translateX: d * step },
-        { perspective: 900 },
-        { rotateY: `${reduced ? 0 : interpolate(d, [-1, 0, 1], [15, 0, -15], Extrapolation.CLAMP)}deg` },
-        { scale: interpolate(ad, [0, 1], [1, 0.74], Extrapolation.CLAMP) },
-      ],
-    };
-  });
+  const d = Animated.subtract(i, pos);   // this slide's distance from the center
+  const style = {
+    opacity: d.interpolate({ inputRange: [-2.2, -1, 0, 1, 2.2], outputRange: [0, 0.55, 1, 0.55, 0], extrapolate: "clamp" as const }),
+    transform: [
+      { translateX: Animated.multiply(d, step) },
+      { perspective: 900 },
+      { rotateY: reduced ? "0deg" : d.interpolate({ inputRange: [-1, 0, 1], outputRange: ["15deg", "0deg", "-15deg"], extrapolate: "clamp" }) },
+      { scale: d.interpolate({ inputRange: [-1, 0, 1], outputRange: [0.74, 1, 0.74], extrapolate: "clamp" }) },
+    ],
+    zIndex: active ? 100 : 50,
+  };
   return (
     <Animated.View style={[s.slide, { width, height, marginLeft: -width / 2 }, style]}
       role="group" aria-roledescription="slide" aria-label={label} aria-hidden={!active}>

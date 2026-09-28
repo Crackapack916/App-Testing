@@ -3,7 +3,7 @@ import { ActivityIndicator, ImageBackground, Linking, Platform, Pressable, Style
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { CircleAlert } from "lucide-react-native";
+import { CircleAlert } from "./icons";
 import { Text } from "./Text";
 import { colors, font, palette, radii, rarityColor, stage, type } from "../lib/theme";
 import { legalityTags } from "../lib/format";

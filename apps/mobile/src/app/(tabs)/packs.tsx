@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Check, ExternalLink, Minus, Plus } from "lucide-react-native";
+import { Check, ExternalLink, Minus, Plus } from "../../components/icons";
 import { Text } from "../../components/Text";
 import { Button, ErrorText, Footer, Stage } from "../../components/bits";
 import { Carousel } from "../../components/Carousel";
@@ -12,7 +12,6 @@ import { useApi } from "../../lib/useApi";
 import { useSession } from "../../lib/session";
 import { countdownText, useServerNow } from "../../lib/clock";
 import { credits, dollars, pacific } from "../../lib/format";
-import { haptic } from "../../lib/feedback";
 import { font, palette, radii, stage, type } from "../../lib/theme";
 
 type Tier = { min_qty: number; per_pack_credits: number };
@@ -49,7 +48,6 @@ export default function Packs() {
   const buy = () => {
     if (!me) return router.push("/sign-in");
     if (balance < total) return router.push("/add-credits");
-    haptic.tap();
     setConfirming(true);
   };
 
@@ -102,8 +100,8 @@ export default function Packs() {
                     const on = qty === n;
                     const off = n > max;
                     return (
-                      <Pressable key={n} testID={`qty-${n}`} accessibilityRole="radio" accessibilityState={{ checked: on, disabled: off }} disabled={off}
-                        onPress={() => { haptic.tap(); setQty(n); }} style={[s.chip, on && s.chipOn, off && { opacity: 0.35 }]}>
+                      <Pressable key={n} testID={`qty-${n}`} accessibilityRole="radio" accessibilityState={{ checked: on, disabled: off }} aria-checked={on} disabled={off}
+                        onPress={() => { setQty(n); }} style={[s.chip, on && s.chipOn, off && { opacity: 0.35 }]}>
                         <Text style={[s.chipQty, on && { color: stage.accentInk }]}>{n} pack{n > 1 ? "s" : ""}</Text>
                         <Text style={[s.chipEach, on && { color: stage.accentInk }]}>{credits(perPack(p.ladder, n))} each</Text>
                       </Pressable>
@@ -229,7 +227,7 @@ function ConfirmSheet({ product, qty, total, suggestLimit, onClose, onPlaced, bo
             </View>
             <Text style={type.small}>Credits are used on CrackAPack packs only. Cancel before 7:00 PM PT for a full credit refund.</Text>
             {mustAccept && (
-              <Pressable testID="accept-policies" accessibilityRole="checkbox" accessibilityState={{ checked: agreed }} onPress={() => setAgreed(!agreed)} style={s.agree}>
+              <Pressable testID="accept-policies" accessibilityRole="checkbox" accessibilityState={{ checked: agreed }} aria-checked={agreed} onPress={() => setAgreed(!agreed)} style={s.agree}>
                 <View style={[s.box, agreed && s.boxOn]}>{agreed ? <Check size={16} color={palette.ink[100]} /> : null}</View>
                 <Text style={[type.body, { flex: 1 }]}>
                   I'm 18 or older and I agree to the{" "}

@@ -1,12 +1,11 @@
 import { useEffect } from "react";
 import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CalendarClock, CircleUser, Package, Search, Vault, type LucideIcon } from "lucide-react-native";
+import { CalendarClock, CircleUser, Package, Search, Vault, type LucideIcon } from "./icons";
 import type { ComponentProps } from "react";
 import type { Tabs } from "expo-router";
 import { Text } from "./Text";
 import { colors, font, palette, status } from "../lib/theme";
-import { haptic } from "../lib/feedback";
 import { useSession } from "../lib/session";
 
 type BottomTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
@@ -31,7 +30,6 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
   useEffect(() => { if (me) refresh(); }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
   const dot = (me?.unseen_cracked ?? 0) > 0;
   const go = (name: string) => {
-    haptic.tap();
     if (current !== name) navigation.navigate(name);
   };
 

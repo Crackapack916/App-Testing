@@ -149,7 +149,7 @@ const s = StyleSheet.create({
   value: { color: colors.text, fontSize: 15 },
   muted: { color: colors.muted, fontSize: 13, lineHeight: 18 },
   body: { color: colors.text, fontSize: 14, lineHeight: 20 },
-  link: { color: colors.accent, fontFamily: font.bodyBold, fontSize: 14 },
+  link: { color: colors.link, fontFamily: font.bodyBold, textDecorationLine: "underline", fontSize: 14 },
   row: { flexDirection: "row", gap: 12, flexWrap: "wrap", alignItems: "center" },
   chip: { borderWidth: 1, borderColor: colors.line, borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8 },
   chipText: { color: colors.text, fontFamily: font.bodyBold },
