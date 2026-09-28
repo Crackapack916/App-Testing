@@ -10,6 +10,9 @@ import setup from "../../../packages/db/test/global-setup";
 import { freshDb } from "../../../packages/db/test/db";
 import { makeCard, makeProduct } from "../../../packages/db/test/fixtures";
 import { hashPassword } from "../../api/src/secrets";
+import { importScryfallBulk } from "../../../packages/catalog/src/provider";
+import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 const API_PORT = Number(process.env.E2E_API_PORT ?? 8789);
 const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 8790);
@@ -36,6 +39,11 @@ await db.q("select record_credit_purchase($1, 5000, 'stripe', 'cs_e2e_seed')", [
 const [lim] = await db.q("insert into users (email, display_name, age_verified_at, password_hash) values ('limits@e2e.test', 'limits', now(), $1) returning id",
   [await hashPassword("limits password")]);
 await db.q("select record_credit_purchase($1, 5000, 'stripe', 'cs_e2e_seed_limits')", [lim.id]);
+// Real printings for search (Scryfall fixtures), except FDN, whose cards the night spec defines.
+const FIX = resolve("../../packages/catalog/test/fixtures/scryfall");
+const tmp = mkdtempSync(join(tmpdir(), "scry-"));
+writeFileSync(join(tmp, "cards.json"), JSON.stringify(JSON.parse(readFileSync(join(FIX, "cards.json"), "utf8")).filter((c: { set: string }) => c.set !== "fdn")));
+await importScryfallBulk(db.pool, { file: join(tmp, "cards.json"), setsFile: join(FIX, "sets.json") });
 await db.pool.end();
 
 const api = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {

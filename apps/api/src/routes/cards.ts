@@ -18,7 +18,7 @@ const LIST_COLS = `cd.id, cd.name, cd.set_code, s.name as set_name, s.icon_svg_u
   cd.finishes, cd.type_line, pr.market_cents as price_cents, pr.finish as price_finish, pr.price_asof, ${IMAGE_SQL}`;
 
 const SORTS: Record<string, string> = {
-  name: "cd.name_folded, s.release_date desc nulls last",
+  name: "cd.name_folded collate \"C\", s.release_date desc nulls last",
   price: "pr.market_cents desc nulls last, cd.name_folded",
   release: "cd.released_at desc nulls last, cd.name_folded",
 };

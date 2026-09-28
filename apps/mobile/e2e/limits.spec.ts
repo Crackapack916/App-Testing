@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // Item 4: limits are optional, editable any time (except loosening during a break), shown in plain words.
 test("set, lower, remove limits, then a break that blocks ordering and can only be ended by request", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/sign-in");
   // A different night from the other specs, so queues never mix.
   await page.evaluate(() => localStorage.setItem("crackapack.testNow", "2026-10-05T15:00:00-07:00")); // Monday
   await page.getByTestId("email").fill("limits@e2e.test");

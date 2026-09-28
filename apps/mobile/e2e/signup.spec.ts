@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 test.use({ viewport: { width: 375, height: 667 }, hasTouch: true, isMobile: true });
 
 test("sign up at 375 by 667: three date fields, auto advance, 18+ checked on the server, no scrolling", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/sign-in");
   await page.evaluate(() => localStorage.setItem("crackapack.testNow", "2026-10-03T15:00:00-07:00"));
   await page.getByTestId("to-signup").click();
 
@@ -45,7 +45,7 @@ test("sign up at 375 by 667: three date fields, auto advance, 18+ checked on the
 });
 
 test("log in with email and password, and a wrong password is refused", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/sign-in");
   await page.getByTestId("email").fill("alice@e2e.test");
   await page.getByTestId("password").fill("wrong password");
   await page.getByTestId("submit").click();

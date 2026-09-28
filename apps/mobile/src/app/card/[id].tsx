@@ -2,36 +2,52 @@ import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-n
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, LegalityTags, Screen } from "../../components/bits";
 import { CardImage } from "../../components/CardImage";
+import { ResultTile, type SearchCard } from "../(tabs)/search";
 import { useApi } from "../../lib/useApi";
 import { dollars } from "../../lib/format";
 import { colors } from "../../lib/theme";
 
 type Card = { id: string; name: string; set_code: string; set_name: string | null; collector_number: string; rarity: string; type_line: string | null;
-  mana_cost: string | null; oracle_text: string | null; finishes: string[]; legalities: Record<string, string>; prices: Record<string, number> | null; image_url: string | null };
+  mana_cost: string | null; oracle_text: string | null; finishes: string[]; legalities: Record<string, string>;
+  prices: Record<string, { cents: number; asof: string }> | null; image_url: string | null };
 
+const asOf = (t: string) => new Date(t).toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", year: "numeric" });
+
+/** Card detail sheet: large image, every printing, legalities, market prices with their date. */
 export default function CardDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data } = useApi<{ card: Card; printings: Card[] }>(`/cards/${id}`);
+  const { data } = useApi<{ card: Card; printings: SearchCard[] }>(`/cards/${id}`);
   const { width } = useWindowDimensions();
   const c = data?.card;
+  const tile = Math.min(140, Math.floor((Math.min(width, 900) - 32 - 24) / 3));
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 14, alignItems: "center" }}>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 14, maxWidth: 900, width: "100%", alignSelf: "center" }}>
         {c && <>
-          <CardImage card={c} width={Math.min(width - 64, 320)} glow />
-          <View style={{ alignSelf: "stretch", gap: 6 }}>
+          <View style={{ alignItems: "center" }}><CardImage card={c} width={Math.min(width - 64, 320)} /></View>
+          <View style={{ gap: 6 }}>
             <Text style={s.name} testID="card-name">{c.name} <Text style={s.muted}>{c.mana_cost}</Text></Text>
             <Text style={s.muted}>{c.type_line}</Text>
             <Text style={s.muted}>{c.set_name ?? c.set_code} · #{c.collector_number} · {c.rarity}</Text>
             {c.oracle_text ? <Text style={s.body}>{c.oracle_text}</Text> : null}
-            <View style={s.prices}>
-              {c.finishes.map((f) => <Text key={f} style={s.price}>{f} {dollars(c.prices?.[f] ?? null)}</Text>)}
+            <Text style={s.section}>Market price</Text>
+            <View style={s.prices} testID="card-prices">
+              {c.finishes.map((f) => {
+                const p = c.prices?.[f];
+                return <Text key={f} style={s.price}>{f}: {p ? `${dollars(p.cents)} as of ${asOf(p.asof)}` : "no price"}</Text>;
+              })}
             </View>
+            <Text style={s.section}>Legality</Text>
             <View testID="card-legalities"><LegalityTags legalities={c.legalities} /></View>
-            {!!data?.printings.length && <Text style={[s.muted, { marginTop: 8 }]}>{data.printings.length} other printings</Text>}
           </View>
+          {!!data?.printings.length && (
+            <View style={{ gap: 8 }}>
+              <Text style={s.section}>Other printings ({data.printings.length})</Text>
+              <View style={s.grid}>{data.printings.map((p) => <ResultTile key={p.id} card={p} width={tile} />)}</View>
+            </View>
+          )}
         </>}
-        <Button kind="ghost" label="Close" onPress={() => router.back()} />
+        <Button kind="ghost" label="Close" onPress={() => (router.canGoBack() ? router.back() : router.replace("/search"))} />
       </ScrollView>
     </Screen>
   );
@@ -41,6 +57,8 @@ const s = StyleSheet.create({
   name: { color: colors.text, fontSize: 22, fontWeight: "800" },
   muted: { color: colors.muted, fontSize: 13, fontWeight: "400" },
   body: { color: colors.text, fontSize: 15, lineHeight: 22, marginTop: 6 },
-  prices: { flexDirection: "row", gap: 16, marginVertical: 8 },
+  section: { color: colors.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1, marginTop: 8 },
+  prices: { gap: 4 },
   price: { color: colors.text, fontWeight: "700", textTransform: "capitalize" },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
 });

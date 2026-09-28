@@ -39,7 +39,7 @@ async function runNight(request: APIRequestContext) {
 }
 
 test("a customer's night: order, get cracked, reveal, vault, ship, search", async ({ page, request }) => {
-  await page.goto("/");
+  await page.goto("/sign-in");
   await setNow(page, BEFORE);
   await page.getByTestId("email").fill("alice@e2e.test");
   await page.getByTestId("password").fill("alice password");

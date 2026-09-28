@@ -13,7 +13,12 @@ export function countdown(to: string | Date, now = Date.now()) {
 const FORMATS = ["standard", "pioneer", "modern", "legacy", "vintage", "commander", "pauper"] as const;
 /** Legality tags for the formats players care most about. */
 export function legalityTags(legalities: Record<string, string> | null | undefined) {
-  return FORMATS.map((f) => ({ format: f, status: (legalities?.[f] ?? "Not legal") as string }));
+  // MTGJSON says "Legal"; Scryfall says "legal" or "not_legal". Show one spelling.
+  const norm = (v: string | undefined) => {
+    const t = (v ?? "not_legal").toLowerCase().replace("_", " ");
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
+  return FORMATS.map((f) => ({ format: f, status: norm(legalities?.[f]) }));
 }
 
 /** A time shown in Pacific, which is how every cutoff and window is defined. */

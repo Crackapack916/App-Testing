@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
+import { SignInPrompt } from "../../components/SignInPrompt";
 import { Button, ErrorText, Panel, Screen } from "../../components/bits";
 import { LimitsPanel } from "../../components/Limits";
 import { api } from "../../lib/api";
@@ -17,6 +18,12 @@ type Order = { id: string; quantity: number; total_credits: number; status: stri
 type Note = { id: string; kind: string; order_id: string; sent_at: string; opened_at: string | null; clip_ref: string | null };
 
 export default function Account() {
+  const { me: signedIn } = useSession();
+  if (!signedIn) return <Screen><SignInPrompt title="Account" body="Log in to see your credits, orders and spending settings." /></Screen>;
+  return <AccountScreen />;
+}
+
+function AccountScreen() {
   const { me, signOut, refresh } = useSession();
   const bundles = useApi<{ bundles: Bundle[] }>("/bundles");
   const orders = useApi<{ orders: Order[] }>("/orders");

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
+import { SignInPrompt } from "../../components/SignInPrompt";
 import { Button, ErrorText, LegalityTags, Screen } from "../../components/bits";
 import { CardImage } from "../../components/CardImage";
 import { api } from "../../lib/api";
@@ -20,6 +21,12 @@ const asItem = (h: Holding, qty: number) => h.individual_card_id
   : { card_id: h.card_id, finish: h.finish, condition: h.condition, qty };
 
 export default function Vault() {
+  const { me: signedIn } = useSession();
+  if (!signedIn) return <Screen><SignInPrompt title="Your Vault" body="Cards from your packs land here after tonight's opening. Log in to see yours." /></Screen>;
+  return <VaultScreen />;
+}
+
+function VaultScreen() {
   const { me } = useSession();
   const canSell = !!me?.features.buyback;
   const vault = useApi<{ cards: Holding[]; total_market_cents: number }>("/me/vault");

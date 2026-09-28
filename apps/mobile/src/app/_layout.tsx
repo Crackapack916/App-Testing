@@ -24,11 +24,15 @@ function Root() {
   if (!ready) return null;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-      <Stack.Protected guard={!!me?.age_verified}>
+      {/* Guests can browse (Search and Drops must work without an account); a signed in
+          customer who hasn't confirmed their age sees only that step. */}
+      <Stack.Protected guard={!me || me.age_verified}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="reveal" options={{ presentation: "fullScreenModal", animation: "fade" }} />
         <Stack.Screen name="card/[id]" options={{ presentation: "modal" }} />
+      </Stack.Protected>
+      <Stack.Protected guard={!!me?.age_verified}>
+        <Stack.Screen name="reveal" options={{ presentation: "fullScreenModal", animation: "fade" }} />
         <Stack.Screen name="clip" options={{ presentation: "fullScreenModal" }} />
       </Stack.Protected>
       <Stack.Protected guard={!!me && !me.age_verified}>
