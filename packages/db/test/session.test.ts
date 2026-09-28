@@ -101,7 +101,7 @@ describe("opening session", () => {
     await expect(atTime(db, "2026-10-02T20:01:00-07:00", "select start_session($1, $2, null)", [b1, staff])).resolves.toBeTruthy();
   });
 
-  it("notifies only after the clip is ready and contents are logged, then records the full custody trail", async () => {
+  it("notifies only after the pack's video is ready and contents are logged, then records the full custody trail", async () => {
     const p = await makeProduct(db);
     const u = await makeUser(db, { credits: 10_000 });
     const card = await makeCard(db, { rarity: "common", priceCents: 5 });
@@ -110,9 +110,10 @@ describe("opening session", () => {
     await run("select open_box($1, $2, 0, $3)", [s, await boxOf(p), staff]);
     const pack = (await run("select * from open_next_pack($1, 1000, $2)", [s, staff]))[0];
 
-    await run("select record_order_clip($1, 900, 60000, $2)", [orderIds[0], staff]);
-    await expect(run("select notify_order($1, $2)", [orderIds[0], staff])).rejects.toThrow(/clip_not_ready/);
-    await run("select mark_clip_ready($1, 'mux-clip-1', $2)", [orderIds[0], staff]);
+    await expect(run("select notify_order($1, $2)", [orderIds[0], staff])).rejects.toThrow(/videos_not_ready/);
+    await run("select start_pack_video($1, $2)", [pack.pack_opening_id, staff]);
+    await expect(run("select notify_order($1, $2)", [orderIds[0], staff])).rejects.toThrow(/videos_not_ready/);
+    await run("select finish_pack_video($1, 'videos/p1.mp4', 1000, $2, 30000, 'video/mp4', null, null, $3)", [pack.pack_opening_id, "a".repeat(64), staff]);
     await expect(run("select notify_order($1, $2)", [orderIds[0], staff])).rejects.toThrow(/contents_not_finalized/);
     for (let slot = 1; slot <= 14; slot++) await run("select log_pack_card($1, $2, 'card', $3, 'nonfoil', 'NM', null, $4)", [pack.pack_opening_id, slot, card, staff]);
     await run("select finalize_pack_contents($1, $2)", [pack.pack_opening_id, staff]);
@@ -122,7 +123,7 @@ describe("opening session", () => {
     const events = await db.q("select event_type from custody_events where batch_id = $1 order by seq", [batchId]);
     expect(events.map((e) => e.event_type)).toEqual([
       "order_placed", "queue_locked", "session_started", "box_opened", "pack_opened",
-      "clip_generated", "contents_finalized", "customer_notified", "session_completed",
+      "video_uploaded", "contents_finalized", "customer_notified", "session_completed",
     ]);
     expect((await db.one("select status from batches where id = $1", [batchId])).status).toBe("completed");
     expect((await db.one("select verify_custody_chain() as broken")).broken).toBeNull();

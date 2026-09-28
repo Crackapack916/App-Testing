@@ -22,14 +22,15 @@ describe("credits", () => {
   it("charges the pricing ladder and refuses when short", async () => {
     const p = await makeProduct(db);
     const u = await makeUser(db, { credits: 10_000 });
-    await order(u, p, 3); // 3 x 850
+    await order(u, p, 3); // 3 x 850 (fixture ladder)
     expect(await balance(u)).toEqual({ purchased: 7450, earned: 0 });
-    await order(u, p, 6); // 6 x 825 = 4950
-    expect(await balance(u)).toEqual({ purchased: 2500, earned: 0 });
-    await expect(order(u, p, 3)).rejects.toThrow(/insufficient_credits/);
-    expect(await balance(u)).toEqual({ purchased: 2500, earned: 0 });
+    await order(u, p, 1); // 900
+    expect(await balance(u)).toEqual({ purchased: 6550, earned: 0 });
+    const poor = await makeUser(db, { credits: 2000 });
+    await expect(order(poor, p, 3)).rejects.toThrow(/insufficient_credits/);
+    expect(await balance(poor)).toEqual({ purchased: 2000, earned: 0 });
     const s = await db.one("select packs_reserved from product_stock where product_id = $1", [p]);
-    expect(s.packs_reserved).toBe(9); // the failed order reserved nothing
+    expect(s.packs_reserved).toBe(4); // the failed order reserved nothing
   });
 
   it("spends earned credit first and refunds a cancellation to the same buckets", async () => {

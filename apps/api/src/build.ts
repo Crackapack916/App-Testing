@@ -6,6 +6,7 @@ import { linkClips, muxClips } from "./clips";
 import { dobKeyFrom } from "./secrets";
 import { logEmail } from "./email";
 import { scryfallProvider } from "@crackapack/catalog/lookup";
+import { blobStorage } from "./videos";
 
 /** Builds the API from environment variables. Shared by the Node server and the Vercel entry. */
 export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
@@ -46,6 +47,7 @@ export function appFromEnv(env: NodeJS.ProcessEnv = process.env) {
     push,
     dobKey: dobKeyFrom(env.DOB_ENCRYPTION_KEY),
     cardData: scryfallProvider(),
+    videos: env.BLOB_READ_WRITE_TOKEN ? blobStorage(env.BLOB_READ_WRITE_TOKEN) : undefined,
     email: logEmail(),
     appUrl: (env.APP_URL ?? "http://localhost:8081").replace(/\/$/, ""),
     clips: env.MUX_TOKEN_ID

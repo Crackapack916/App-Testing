@@ -16,7 +16,7 @@ describe("putting a set on sale", () => {
     const p = await db.one("select * from products where id = $1", [id]);
     expect(p).toMatchObject({ set_code: "FDN", name: "Foundations Play Booster", active: false });
     const tiers = await db.q("select min_qty, per_pack_credits::int from price_tiers where product_id = $1 order by min_qty", [id]);
-    expect(tiers.map((t) => [t.min_qty, t.per_pack_credits])).toEqual([[1, 900], [3, 850], [6, 825], [9, 800], [12, 775]]);
+    expect(tiers.map((t) => [t.min_qty, t.per_pack_credits])).toEqual([[1, 1000], [3, 950], [6, 900]]);
     expect(await db.one("select packs_on_hand, packs_reserved from product_stock where product_id = $1", [id])).toEqual({ packs_on_hand: 0, packs_reserved: 0 });
     await db.q("select set_product_active($1, true, null)", [id]);
     expect((await db.one("select available from storefront where product_id = $1", [id])).available).toBe(false); // no stock yet

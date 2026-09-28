@@ -8,11 +8,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@crackapack/catalog": "workspace:*",
     "@crackapack/payments": "workspace:*",
     "@hono/node-server": "^1.13.0",
+    "@vercel/blob": "^2.8.0",
     "hono": "^4.6.0",
-    "pg": "^8.13.0",
-    "@crackapack/catalog": "workspace:*"
+    "pg": "^8.13.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

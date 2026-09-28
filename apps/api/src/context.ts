@@ -20,6 +20,8 @@ export interface Services {
   dobKey: Buffer | null;
   /** Customer and staff email. */
   email: EmailProvider;
+  /** Pack video storage (Vercel Blob). Unset: uploads and playback return videos_unavailable. */
+  videos?: import("./videos").VideoStorage;
   /** Looks up a printing our table doesn't have yet (very new sets), for pack logging. */
   cardData?: CardDataProvider;
   /** Public site origin for links in emails, e.g. https://crackapack-preview.vercel.app */

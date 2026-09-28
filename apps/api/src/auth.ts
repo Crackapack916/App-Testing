@@ -25,6 +25,21 @@ export function requireUser(...roles: Role[]): MiddlewareHandler<Env> {
   };
 }
 
+/** Sets the user when a valid token is sent; guests continue without one. */
+export function optionalUser(): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    const header = c.req.header("authorization") ?? "";
+    if (header.startsWith("Bearer ")) {
+      try {
+        const userId = await resolveUserId(c, header.slice(7));
+        const { rows } = await c.get("db").query<User>("select id, role, display_name from users where id = $1", [userId]);
+        if (rows[0]) c.set("user", rows[0]);
+      } catch { /* an expired token browses as a guest */ }
+    }
+    await next();
+  };
+}
+
 /** Tokens are issued by /auth/login, /auth/signup and /auth/reset (or /dev/login in tests). */
 async function resolveUserId(c: Context<Env>, token: string): Promise<string> {
   try {
