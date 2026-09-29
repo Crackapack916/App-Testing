@@ -70,7 +70,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
       {tonight.error && <div className="banner error">{tonight.error}</div>}
       <main>
         {tab === "tonight" && <Tonight data={tonight.data} reload={tonight.reload} goSession={() => setTab("session")} />}
-        {tab === "session" && <Session batch={batch} reload={tonight.reload} />}
+        {tab === "session" && <Session batch={batch ?? tonight.data?.unfinished.at(-1) ?? null} reload={tonight.reload} />}
         {(tab === "log" || tab === "videos") && nights.length > 1 && (
           <div className="banner warn night-picker">
             <label>Night

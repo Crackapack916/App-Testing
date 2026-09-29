@@ -14,11 +14,6 @@ export function Tonight({ data, reload, goSession }: { data: TonightData | null;
   const realTime = () => { testClock.reset(); reload(); };
 
   const lock = () => run(async () => { await api("POST", `/staff/batches/${batch!.id}/lock`); reload(); });
-  const start = () => run(async () => {
-    await api("POST", `/staff/batches/${batch!.id}/sessions`, {});
-    reload();
-    goSession();
-  });
 
   const orders = new Set(queue.map((q) => q.order_id)).size;
   const short = stock.filter((s) => s.packs_on_hand - s.packs_reserved < s.safety_buffer_packs);
@@ -71,12 +66,12 @@ export function Tonight({ data, reload, goSession }: { data: TonightData | null;
           {batch.status === "locked" && (
             <div className="action">
               <p>Queue locked. Manifest <code data-testid="manifest">{batch.manifest_hash}</code></p>
-              <p className="muted">Open the packs in queue order, recording each one on your phone. You'll upload one video per pack on Videos (N).</p>
-              <button className="primary big" disabled={busy} onClick={start} data-testid="start">Start opening</button>
+              <p className="muted">Open the packs in queue order, recording each one on your phone. Upload one video per pack on Videos (N) afterwards.</p>
+              <button className="primary big" onClick={goSession} data-testid="start">Open packs</button>
             </div>
           )}
           {batch.status === "in_session" && (
-            <div className="action"><button className="primary big" onClick={goSession}>Continue opening</button></div>
+            <div className="action"><button className="primary big" onClick={goSession}>Open packs</button></div>
           )}
           {error && <div className="banner error">{error}</div>}
         </section>

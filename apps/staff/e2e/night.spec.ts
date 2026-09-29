@@ -26,11 +26,11 @@ test("a full night: lock, film in strict order, log cards, upload videos, approv
   await expect(queue.locator("tbody tr td:first-child")).toHaveText(["1", "2", "3"]);
   await shot(page, "1-tonight-locked");
 
-  // Start opening (each pack is recorded on a phone and uploaded later, one video per pack).
+  // Open packs: nothing to start. Each pack is recorded on a phone and uploaded later.
   await setTime(page, "2026-10-01T19:10:00-07:00");
   await page.getByTestId("start").click();
 
-  // Session: B opens the box on camera, Space cracks the next pack in queue order.
+  // B opens the box, Space cracks the next pack in queue order.
   const next = page.getByTestId("next");
   await expect(next).toContainText("#1");
   await expect(next).toContainText("alice");
@@ -46,8 +46,8 @@ test("a full night: lock, film in strict order, log cards, upload videos, approv
   }
   await setTime(page, "2026-10-01T19:15:00-07:00");
   await page.keyboard.press("Space");
-  await expect(page.getByText("Queue complete")).toBeVisible();
-  await page.getByTestId("complete").click();
+  // The last pack finishes the night's opening by itself.
+  await expect(page.getByTestId("opening-done")).toContainText("All packs opened");
 
   // Log cards from the locked queue: number, then finish, then Enter. Keyboard only.
   await page.keyboard.press("l");

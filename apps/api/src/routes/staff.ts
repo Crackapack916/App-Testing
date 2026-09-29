@@ -151,6 +151,81 @@ staff.post("/sessions/:id/complete", async (c) => {
   return c.json({ ok: true });
 });
 
+// Opening packs, by night (no separate session step) -------------------------------------
+// Staff never start or end anything: the first box or pack opened for a locked night starts
+// its opening, and the last pack finishes it. Packs are still matched to the locked queue in
+// order by open_next_pack; each pack's video is uploaded afterwards on the Videos screen.
+
+async function openingFor(db: pg.PoolClient, batchId: string) {
+  const { rows: [s] } = await db.query("select id, ended_at from opening_sessions where batch_id = $1", [batchId]);
+  return s as { id: string; ended_at: string | null } | undefined;
+}
+
+/** The night's opening, started on first use. */
+async function ensureOpening(c: { get: (k: "db" | "user") => any }, batchId: string) {
+  const db: pg.PoolClient = c.get("db");
+  const existing = await openingFor(db, batchId);
+  if (existing) return existing.id;
+  const { rows: [r] } = await db.query("select start_session($1, $2, null) as id", [batchId, c.get("user").id]);
+  return r.id as string;
+}
+
+staff.get("/batches/:id/opening", async (c) => {
+  const db = c.get("db");
+  const batchId = c.req.param("id");
+  const { rows: [b] } = await db.query(
+    `select b.id, b.batch_date::text, b.status, b.manifest_hash,
+            (select count(*) from queue_entries q where q.batch_id = b.id and q.status = 'opened')::int as opened,
+            (select count(*) from queue_entries q where q.batch_id = b.id and q.status <> 'cancelled')::int as total
+     from batches b where b.id = $1`, [batchId]);
+  if (!b) throw new ApiError("unknown_batch");
+  const s = await openingFor(db, batchId);
+  const { rows: [next] } = await db.query(
+    `select q.position, q.pack_index, o.quantity, o.id as order_id, p.id as product_id, p.name as product,
+            coalesce(u.display_name, split_part(u.email, '@', 1)) as customer,
+            (select json_build_object('id', x.id, 'label', x.label, 'packs_opened', x.packs_opened, 'pack_count', x.pack_count)
+             from sealed_boxes x where x.product_id = q.product_id and x.status = 'opened') as open_box,
+            (select coalesce(json_agg(json_build_object('id', x.id, 'label', x.label, 'pack_count', x.pack_count) order by x.received_at, x.label), '[]')
+             from sealed_boxes x where x.product_id = q.product_id and x.status = 'sealed') as sealed_boxes
+     from queue_entries q join orders o on o.id = q.order_id join products p on p.id = q.product_id join users u on u.id = q.user_id
+     where q.batch_id = $1 and q.status = 'queued' and q.position is not null
+     order by q.position limit 1`, [batchId]);
+  const { rows: recent } = s ? await db.query(
+    `select po.id, po.status, po.void_reason, q.position, q.order_id, x.label as box, po.pack_number_in_box, po.opened_at
+     from pack_openings po left join queue_entries q on q.id = po.queue_entry_id join sealed_boxes x on x.id = po.box_id
+     where po.session_id = $1 order by po.opened_at desc limit 8`, [s.id]) : { rows: [] };
+  return c.json({ batch: b, finished_at: s?.ended_at ?? null, next: next ?? null, recent });
+});
+
+staff.post("/batches/:id/opening/boxes/:boxId/open", async (c) => {
+  const sessionId = await ensureOpening(c, c.req.param("id"));
+  await c.get("db").query(`select open_box($1, $2, ${OFFSET_SQL}, $3)`, [sessionId, c.req.param("boxId"), c.get("user").id]);
+  return c.json({ ok: true });
+});
+
+staff.post("/batches/:id/opening/next", async (c) => {
+  const db = c.get("db");
+  const batchId = c.req.param("id");
+  const sessionId = await ensureOpening(c, batchId);
+  const { rows: [p] } = await db.query(`select * from open_next_pack($1, ${OFFSET_SQL}, $2)`, [sessionId, c.get("user").id]);
+  await closeFinishedClips(c, sessionId, p.order_id);
+  // The last pack finishes the night's opening.
+  const { rows: [left] } = await db.query("select count(*)::int as n from queue_entries where batch_id = $1 and status = 'queued'", [batchId]);
+  if (left.n === 0) {
+    await closeFinishedClips(c, sessionId, null);
+    await db.query("select complete_session($1, null, $2)", [sessionId, c.get("user").id]);
+  }
+  return c.json({ ...p, finished: left.n === 0 });
+});
+
+staff.post("/batches/:id/opening/void", async (c) => {
+  const { product_id, reason } = await c.req.json<{ product_id: string; reason: string }>();
+  const sessionId = await ensureOpening(c, c.req.param("id"));
+  const { rows: [r] } = await c.get("db").query(`select void_pack($1, $2, $3, ${OFFSET_SQL}, $4) as id`,
+    [sessionId, product_id, reason, c.get("user").id]);
+  return c.json({ pack_opening_id: r.id });
+});
+
 /**
  * Records and requests clips for fully opened orders that don't have one yet.
  * A clip runs from just before the order's first pack to the moment the next order's
