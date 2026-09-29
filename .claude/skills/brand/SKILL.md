@@ -36,6 +36,6 @@ Customer app tokens live only in `apps/mobile/src/lib/theme.ts`; the staff site 
 
 ## Guardrails (brief rule 5)
 * No value headlines: no best pull, no vault total, no "hit" callouts. Prices appear per card, small; gold is for credits.
-* The quick reveal shows the logged cards in pulled order, the same beat for every card, no sound, tap to show all, and says it is the same cards as the filmed pack.
+* The reveal deals the logged cards face down in pulled order. Tap flips one, Reveal all flips the rest one beat apart, press and hold zooms. Same beat for every card, no sound, and it says these are the filmed pack's cards.
 * No fake scarcity or countdown pressure beyond the real 7:00 PM cutoff and the real packs left tonight.
 * Text never uses dashes as punctuation.

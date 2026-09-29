@@ -105,15 +105,25 @@ test("a customer's night: order, get cracked, watch, vault, ship, search", async
   await expect(page.getByTestId("reel-count")).toHaveText("1 / 3");
   await expect(page.getByTestId("reel-video").first().locator("video")).toHaveAttribute("src", /\/videos\/local\/packs\/.+\.mp4\?exp=\d+&sig=[0-9a-f]{64}/);
   await shot(page, "m4-reel-video");
-  // The quick reveal shows the same logged cards, in pulled order. A tap shows them all.
+  // The quick reveal deals the same logged cards face down, in pulled order.
   await page.getByTestId("mode-reveal").click();
   const reveal = page.getByTestId("reel-reveal").first();
   await expect(reveal.getByTestId("reveal-card-3")).toBeVisible();
-
-  // A tap anywhere shows every card at once (a real tap at the middle of the reveal).
-  const box = (await reveal.boundingBox())!;
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.getByTestId("reveal-replay").first()).toBeVisible();
+  // Tap one card to flip it; hold a face up card to zoom, let go to return.
+  await reveal.getByTestId("reveal-touch-1").click();
+  await expect(reveal.getByTestId("reveal-touch-1")).toHaveAttribute("aria-label", /Press and hold to zoom/);
+  await expect(reveal.getByTestId("reveal-touch-2")).toHaveAttribute("aria-label", /face down/);
+  const box = (await reveal.getByTestId("reveal-touch-1").boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(reveal.getByTestId("reveal-zoom")).toBeVisible();
+  await shot(page, "m4-reel-zoom");
+  await page.mouse.up();
+  await expect(reveal.getByTestId("reveal-zoom")).toHaveCount(0);
+  // Reveal all flips the rest; then Replay deals again.
+  await reveal.getByTestId("reveal-all").click();
+  await expect(reveal.getByTestId("reveal-replay")).toBeVisible();
+  await expect(reveal.getByTestId("reveal-touch-3")).toHaveAttribute("aria-label", /Press and hold to zoom/);
   await shot(page, "m4-reel-reveal");
   // Next pack: a swipe on a phone, the down key on a keyboard.
   await page.keyboard.press("ArrowDown");

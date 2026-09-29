@@ -154,7 +154,7 @@ function ReelItem({ p, mode, active, width, height, top, bottom }:
               : <Text style={type.small}>{error ?? (active ? "Loading video" : "")}</Text>}
           </View>
         ) : cards ? (
-          <Reveal cards={cards} packPhoto={p.pack_image_url} width={boxW} height={boxH - 28} playing={active} testID="reel-reveal" />
+          <Reveal cards={cards} packPhoto={p.pack_image_url} width={boxW} height={boxH} playing={active} testID="reel-reveal" />
         ) : <Text style={type.small}>{error ?? "Loading"}</Text>}
       </View>
       <View style={[s.foot, { height: bottom }]}>
@@ -167,7 +167,6 @@ function ReelItem({ p, mode, active, width, height, top, bottom }:
           <Text style={s.cardsText}>See cards</Text>
         </Pressable>
       </View>
-      {mode === "reveal" && <Text style={s.note}>Same cards, in the order they came out of your filmed pack.</Text>}
     </View>
   );
 }
@@ -188,7 +187,6 @@ const s = StyleSheet.create({
   set: { fontFamily: font.bodyBold, fontSize: 18, color: colors.text },
   cardsLink: { minHeight: 44, justifyContent: "center", paddingHorizontal: 14, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.lineStrong },
   cardsText: { fontFamily: font.bodySemi, fontSize: 13, color: colors.text },
-  note: { position: "absolute", top: 58, alignSelf: "center", fontFamily: font.body, fontSize: 11.5, color: colors.faint, paddingHorizontal: 16, textAlign: "center" },
   arrows: { position: "absolute", right: 12, gap: 8 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center" },
 });
