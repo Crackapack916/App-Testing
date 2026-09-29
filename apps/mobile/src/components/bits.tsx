@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, View, type ViewStyle } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import { LinearGradient, type LinearGradientProps } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CircleAlert } from "./icons";
@@ -10,16 +10,20 @@ import { legalityTags } from "../lib/format";
 import { credits } from "../lib/format";
 import { useSession } from "../lib/session";
 
+// pnpm hoists the staff site's React 18 types for these two packages; the components are the same.
+const Gradient = LinearGradient as unknown as ComponentType<LinearGradientProps & { children?: ReactNode }>;
+const Safe = SafeAreaView as unknown as ComponentType<{ edges?: ("top" | "bottom")[]; style?: unknown; children?: ReactNode }>;
+
 export const SUPPORT_EMAIL = "crackapack.business@gmail.com";
 
 /** The brand stage on every page: Ink fading into deep violet, with a soft magenta glow. */
 export function Screen({ children, style, safe = true }: { children: ReactNode; style?: ViewStyle; safe?: boolean }) {
-  const body = safe ? <SafeAreaView edges={["top"]} style={[{ flex: 1 }, style]}>{children}</SafeAreaView> : <View style={[{ flex: 1 }, style]}>{children}</View>;
+  const body = safe ? <Safe edges={["top"]} style={[{ flex: 1 }, style]}>{children}</Safe> : <View style={[{ flex: 1 }, style]}>{children}</View>;
   return (
-    <LinearGradient colors={[colors.bg, colors.bgEnd]} start={{ x: 0, y: 0.1 }} end={{ x: 0.3, y: 1 }} style={{ flex: 1 }}>
+    <Gradient colors={[colors.bg, colors.bgEnd]} start={{ x: 0, y: 0.1 }} end={{ x: 0.3, y: 1 }} style={{ flex: 1 }}>
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, s.glowWrap]}><View style={s.glow} /></View>
       {body}
-    </LinearGradient>
+    </Gradient>
   );
 }
 /** Same stage; kept so older screens read naturally. */

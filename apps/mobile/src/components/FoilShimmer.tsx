@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ComponentType } from "react";
 import { Animated, Easing, Platform, StyleSheet } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import { LinearGradient, type LinearGradientProps } from "expo-linear-gradient";
 import { useReducedMotion } from "../lib/motion";
 import { brand } from "../lib/theme";
 
-const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
+// pnpm hoists the staff site's React 18 types for expo-linear-gradient; the component is the same.
+const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient as unknown as ComponentType<LinearGradientProps>);
 
 /**
  * Holographic foil, drawn in the card frame only (never over the card image, so the
