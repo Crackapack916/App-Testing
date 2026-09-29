@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Check, ExternalLink, Minus, Plus } from "../../components/icons";
 import { Text } from "../../components/Text";
-import { Button, ErrorText, Footer, Stage } from "../../components/bits";
+import { Button, ErrorText, Footer, Stage, Title } from "../../components/bits";
 import { Carousel } from "../../components/Carousel";
 import { PackArt } from "../../components/PackArt";
 import { api } from "../../lib/api";
@@ -12,7 +13,7 @@ import { useApi } from "../../lib/useApi";
 import { useSession } from "../../lib/session";
 import { countdownText, useServerNow } from "../../lib/clock";
 import { credits, dollars, pacific } from "../../lib/format";
-import { font, palette, radii, stage, type } from "../../lib/theme";
+import { brand, colors, font, palette, radii, type } from "../../lib/theme";
 
 type Tier = { min_qty: number; per_pack_credits: number };
 type Status = "available" | "sold_out" | "night_full" | "upcoming" | "ended" | "on_break" | "unavailable";
@@ -54,27 +55,23 @@ export default function Packs() {
   return (
     <Stage>
       <ScrollView contentContainerStyle={{ paddingBottom: 110 }}>
-        <View style={s.head}>
-          <Text style={s.h1} accessibilityRole="header">Packs</Text>
-          {me ? (
-            <Pressable onPress={() => router.push("/account")} accessibilityRole="link" accessibilityLabel={`${credits(balance)} credits`} style={s.balance}>
-              <Text style={s.balanceNum} testID="balance">{credits(balance)}</Text>
-              <Text style={s.balanceLabel}>credits</Text>
-            </Pressable>
-          ) : null}
-        </View>
+        <Title>Packs</Title>
 
         {store.data && !products.length ? (
           <View style={s.none}>
             <Text style={s.title}>Nothing on sale right now</Text>
             <Text style={s.muted}>See Drops for when the next set goes live.</Text>
-            <Button kind="ghost" onStage label="See drops" onPress={() => router.push("/drops")} />
+            <Button kind="ghost" label="See drops" onPress={() => router.push("/drops")} />
           </View>
         ) : null}
 
         {products.length > 0 && (
           <>
-            <View style={s.glowWrap} pointerEvents="none"><View style={[s.glow, { width: itemWidth * 1.4, height: itemWidth * 1.4 }]} /></View>
+            <View style={s.glowWrap} pointerEvents="none">
+              <View style={[s.ring, { width: itemWidth * 1.3, height: itemWidth * 1.3 }]}>
+                <View style={[s.ringInner, { width: itemWidth * 0.95, height: itemWidth * 0.95 }]} />
+              </View>
+            </View>
             <Carousel testID="pack-carousel" label="Sets on sale" onStage items={products} index={index} onIndexChange={setIndex}
               keyOf={(x) => x.product_id} labelOf={(x) => x.name} itemWidth={itemWidth} height={Math.round(itemWidth * 1.62) + 24}
               render={(x) => (
@@ -90,7 +87,7 @@ export default function Packs() {
             <Text style={s.title}>{p.name}</Text>
             <Text style={s.price}>
               <Text style={s.priceNum}>{credits(perPack(p.ladder, 1))}</Text> credits a pack
-              <Text style={s.muted}>  {dollars(perPack(p.ladder, 1))}</Text>
+              <Text style={s.dollars}>  {dollars(perPack(p.ladder, 1))}</Text>
             </Text>
 
             {p.status === "available" ? (
@@ -102,18 +99,18 @@ export default function Packs() {
                     return (
                       <Pressable key={n} testID={`qty-${n}`} accessibilityRole="radio" accessibilityState={{ checked: on, disabled: off }} aria-checked={on} disabled={off}
                         onPress={() => { setQty(n); }} style={[s.chip, on && s.chipOn, off && { opacity: 0.35 }]}>
-                        <Text style={[s.chipQty, on && { color: stage.accentInk }]}>{n} pack{n > 1 ? "s" : ""}</Text>
-                        <Text style={[s.chipEach, on && { color: stage.accentInk }]}>{credits(perPack(p.ladder, n))} each</Text>
+                        <Text style={[s.chipQty, on && { color: colors.accentInk }]}>{n} pack{n > 1 ? "s" : ""}</Text>
+                        <Text style={[s.chipEach, on && { color: colors.accentInk }]}>{credits(perPack(p.ladder, n))} each</Text>
                       </Pressable>
                     );
                   })}
                 </View>
                 <View style={s.stepper}>
                   <Pressable testID="qty-minus" accessibilityRole="button" accessibilityLabel="One fewer" disabled={qty <= 1}
-                    onPress={() => setQty(qty - 1)} style={[s.step, qty <= 1 && { opacity: 0.35 }]}><Minus size={18} color={stage.text} /></Pressable>
+                    onPress={() => setQty(qty - 1)} style={[s.step, qty <= 1 && { opacity: 0.35 }]}><Minus size={18} color={colors.text} /></Pressable>
                   <Text style={s.qty} testID="qty" accessibilityLiveRegion="polite">{qty}</Text>
                   <Pressable testID="qty-plus" accessibilityRole="button" accessibilityLabel="One more" disabled={qty >= max}
-                    onPress={() => setQty(qty + 1)} style={[s.step, qty >= max && { opacity: 0.35 }]}><Plus size={18} color={stage.text} /></Pressable>
+                    onPress={() => setQty(qty + 1)} style={[s.step, qty >= max && { opacity: 0.35 }]}><Plus size={18} color={colors.text} /></Pressable>
                 </View>
               </>
             ) : <StateNote p={p} breakUntil={store.data?.break_until ?? null} />}
@@ -129,7 +126,7 @@ export default function Packs() {
             )}
             {p.wizards_info_url ? (
               <Pressable accessibilityRole="link" onPress={() => Linking.openURL(p.wizards_info_url!)} style={s.link} testID="whats-in-a-pack">
-                <Text style={s.linkText}>What's in a pack</Text><ExternalLink size={14} color={stage.accent} />
+                <Text style={s.linkText}>What's in a pack</Text><ExternalLink size={14} color={brand.gold} />
               </Pressable>
             ) : null}
             <Pressable accessibilityRole="link" onPress={() => router.push("/policies")} style={s.link} testID="how-it-works">
@@ -146,10 +143,10 @@ export default function Packs() {
       </ScrollView>
 
       {p && p.status === "available" && (
-        <View style={[s.pinned, { paddingBottom: 12 }]}>
+        <LinearGradient colors={["rgba(22, 20, 28, 0)", "rgba(22, 20, 28, 0.85)"]} style={[s.pinned, { paddingBottom: 12 }]} pointerEvents="box-none">
           <Button testID="buy" label={!me ? "Log in to buy" : balance < total ? `Add credits to buy (${credits(total)})` : `Buy ${qty} · ${credits(total)} credits`}
             onPress={buy} style={{ width: "100%", maxWidth: 520 }} />
-        </View>
+        </LinearGradient>
       )}
       {confirming && p && (
         <ConfirmSheet product={p} qty={qty} total={total} suggestLimit={!!limits.data?.suggest_limit}
@@ -173,7 +170,7 @@ function StateNote({ p, breakUntil }: { p: Product; breakUntil: string | null })
     <View style={s.state} testID={`state-${p.status}`}>
       <Text style={s.stateTitle}>{n.title}</Text>
       <Text style={s.muted}>{n.body}</Text>
-      {n.action ? <Button kind="ghost" onStage label={n.action.label} onPress={() => router.push(n.action!.to as never)} /> : null}
+      {n.action ? <Button kind="ghost" label={n.action.label} onPress={() => router.push(n.action!.to as never)} /> : null}
     </View>
   );
 }
@@ -229,7 +226,7 @@ function ConfirmSheet({ product, qty, total, suggestLimit, onClose, onPlaced, bo
             <Text style={type.small}>Credits are used on CrackAPack packs only. Cancel before 7:00 PM PT for a full credit refund.</Text>
             {mustAccept && (
               <Pressable testID="accept-policies" accessibilityRole="checkbox" accessibilityState={{ checked: agreed }} aria-checked={agreed} onPress={() => setAgreed(!agreed)} style={s.agree}>
-                <View style={[s.box, agreed && s.boxOn]}>{agreed ? <Check size={16} color={palette.ink[100]} /> : null}</View>
+                <View style={[s.box, agreed && s.boxOn]}>{agreed ? <Check size={16} color={colors.accentInk} /> : null}</View>
                 <Text style={[type.body, { flex: 1 }]}>
                   I'm 18 or older and I agree to the{" "}
                   <Text style={s.inlineLink} accessibilityRole="link" onPress={() => { onClose(); router.push("/policies/terms"); }}>Terms</Text> and{" "}
@@ -247,43 +244,41 @@ function ConfirmSheet({ product, qty, total, suggestLimit, onClose, onPlaced, bo
 }
 
 const s = StyleSheet.create({
-  head: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingTop: 12, maxWidth: 900, width: "100%", alignSelf: "center" },
-  h1: { fontFamily: font.display, fontSize: 20, color: stage.text, letterSpacing: 0.4 },
-  balance: { alignItems: "flex-end", borderLeftWidth: 3, borderLeftColor: stage.accent, paddingLeft: 10 },
-  balanceNum: { color: stage.text, fontSize: 18, fontFamily: font.monoMedium },
-  balanceLabel: { color: stage.muted, fontSize: 11, fontFamily: font.body },
   none: { alignItems: "center", gap: 10, padding: 40 },
-  glowWrap: { position: "absolute", top: 60, left: 0, right: 0, alignItems: "center" },
-  glow: { borderRadius: 999, backgroundColor: "rgba(135, 207, 239, 0.10)" },
+  glowWrap: { position: "absolute", top: 70, left: 0, right: 0, alignItems: "center" },
+  ring: { borderRadius: 999, backgroundColor: "rgba(255, 61, 129, 0.12)", borderWidth: 1, borderColor: "rgba(255, 61, 129, 0.25)",
+    alignItems: "center", justifyContent: "center" },
+  ringInner: { borderRadius: 999, backgroundColor: "rgba(122, 92, 255, 0.28)" },
   detail: { gap: 12, paddingHorizontal: 16, paddingTop: 8, maxWidth: 520, width: "100%", alignSelf: "center" },
-  title: { fontFamily: font.display, fontSize: 24, lineHeight: 30, color: stage.text, textAlign: "center" },
-  price: { fontFamily: font.body, fontSize: 15, color: stage.muted, textAlign: "center" },
-  priceNum: { fontFamily: font.displaySemi, fontSize: 20, color: stage.text },
-  muted: { fontFamily: font.body, fontSize: 13, lineHeight: 19, color: stage.muted, textAlign: "center" },
+  title: { fontFamily: font.display, fontSize: 22, lineHeight: 30, color: colors.text, textAlign: "center" },
+  price: { fontFamily: font.body, fontSize: 14, color: colors.muted, textAlign: "center" },
+  priceNum: { fontFamily: font.bodyBold, fontSize: 21, color: colors.text },
+  dollars: { fontFamily: font.bodySemi, fontSize: 14, color: brand.gold },
+  muted: { fontFamily: font.body, fontSize: 13, lineHeight: 19, color: colors.muted, textAlign: "center" },
   chips: { flexDirection: "row", gap: 8 },
-  chip: { flex: 1, borderWidth: 1.5, borderColor: stage.line, borderRadius: radii.control, paddingVertical: 10, alignItems: "center", backgroundColor: stage.panel },
-  chipOn: { backgroundColor: stage.accent, borderColor: stage.accent },
-  chipQty: { fontFamily: font.bodyBold, fontSize: 14, color: stage.text },
-  chipEach: { fontFamily: font.mono, fontSize: 12, color: stage.muted, marginTop: 2 },
-  stepper: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 20 },
-  step: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: stage.line, alignItems: "center", justifyContent: "center" },
-  qty: { fontFamily: font.monoMedium, fontSize: 22, color: stage.text, minWidth: 30, textAlign: "center" },
-  cutoff: { fontFamily: font.bodySemi, fontSize: 14, color: stage.text, textAlign: "center" },
-  mono: { fontFamily: font.monoMedium, color: stage.accent },
+  chip: { flex: 1, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: radii.tile, paddingVertical: 10, alignItems: "center", backgroundColor: colors.panel },
+  chipOn: { backgroundColor: brand.magenta, borderColor: brand.magenta },
+  chipQty: { fontFamily: font.bodyBold, fontSize: 14, color: colors.text },
+  chipEach: { fontFamily: font.body, fontSize: 12, color: colors.muted, marginTop: 1 },
+  stepper: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 24 },
+  step: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.lineStrong, alignItems: "center", justifyContent: "center" },
+  qty: { fontFamily: font.bodyBold, fontSize: 22, color: colors.text, minWidth: 30, textAlign: "center" },
+  cutoff: { fontFamily: font.bodyMedium, fontSize: 13.5, color: colors.text, textAlign: "center" },
+  mono: { fontFamily: font.bodyBold, color: brand.gold },
   link: { flexDirection: "row", gap: 6, alignItems: "center", alignSelf: "center", minHeight: 44 },
-  linkText: { fontFamily: font.bodySemi, fontSize: 14, color: stage.accent, textDecorationLine: "underline" },
-  fine: { fontFamily: font.body, fontSize: 12, lineHeight: 18, color: stage.muted, textAlign: "center" },
-  state: { gap: 8, alignItems: "center", padding: 16, borderWidth: 1, borderColor: stage.line, borderRadius: radii.panel, backgroundColor: stage.panel },
-  stateTitle: { fontFamily: font.displaySemi, fontSize: 18, color: stage.text },
-  pinned: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 12, backgroundColor: "rgba(10, 16, 26, 0.92)",
-    borderTopWidth: 1, borderTopColor: stage.line, alignItems: "center" },
-  scrim: { flex: 1, backgroundColor: "rgba(10, 16, 26, 0.6)" },
-  sheet: { backgroundColor: palette.ink[100], borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxWidth: 560, width: "100%", alignSelf: "center" },
+  linkText: { fontFamily: font.bodySemi, fontSize: 13.5, color: brand.gold, textDecorationLine: "underline" },
+  fine: { fontFamily: font.body, fontSize: 12, lineHeight: 18, color: colors.muted, textAlign: "center" },
+  state: { gap: 8, alignItems: "center", padding: 16, borderWidth: 1, borderColor: colors.line, borderRadius: radii.panel, backgroundColor: colors.panel },
+  stateTitle: { fontFamily: font.display, fontSize: 18, color: colors.text },
+  pinned: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 24, alignItems: "center" },
+  scrim: { flex: 1, backgroundColor: "rgba(10, 8, 16, 0.7)" },
+  sheet: { backgroundColor: palette.panel, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, maxWidth: 560, width: "100%", alignSelf: "center",
+    borderWidth: 1, borderColor: palette.line },
   row: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
   agree: { flexDirection: "row", gap: 10, alignItems: "flex-start", minHeight: 44 },
-  box: { width: 24, height: 24, borderRadius: 4, borderWidth: 2, borderColor: palette.blue[500], alignItems: "center", justifyContent: "center", marginTop: 1 },
-  boxOn: { backgroundColor: palette.blue[500] },
-  inlineLink: { color: palette.blue[500], textDecorationLine: "underline", fontFamily: font.bodySemi },
+  box: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: brand.magenta, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  boxOn: { backgroundColor: brand.magenta },
+  inlineLink: { color: colors.link, textDecorationLine: "underline", fontFamily: font.bodySemi },
   totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  total: { fontFamily: font.monoMedium, fontSize: 20, color: palette.ink[700] },
+  total: { fontFamily: font.bodyBold, fontSize: 20, color: brand.gold },
 });

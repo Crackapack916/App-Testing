@@ -1,9 +1,7 @@
 import { View } from "react-native";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
-import { Fraunces_600SemiBold, Fraunces_700Bold, Fraunces_800ExtraBold } from "@expo-google-fonts/fraunces";
-import { InstrumentSans_400Regular, InstrumentSans_500Medium, InstrumentSans_600SemiBold, InstrumentSans_700Bold } from "@expo-google-fonts/instrument-sans";
-import { IBMPlexMono_400Regular, IBMPlexMono_500Medium } from "@expo-google-fonts/ibm-plex-mono";
+import { Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold, Poppins_800ExtraBold } from "@expo-google-fonts/poppins";
 import "../global.css";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -15,7 +13,7 @@ export default function RootLayout() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <SafeAreaProvider>
         <SessionProvider>
-          <StatusBar style="dark" />
+          <StatusBar style="light" />
           <Root />
         </SessionProvider>
       </SafeAreaProvider>
@@ -26,9 +24,7 @@ export default function RootLayout() {
 function Root() {
   const { ready, me } = useSession();
   // Bundled with the site (self hosted); the fallback stacks cover the moment before they load.
-  const [fontsLoaded, fontError] = useFonts({ Fraunces_600SemiBold, Fraunces_700Bold, Fraunces_800ExtraBold,
-    InstrumentSans_400Regular, InstrumentSans_500Medium, InstrumentSans_600SemiBold, InstrumentSans_700Bold,
-    IBMPlexMono_400Regular, IBMPlexMono_500Medium });
+  const [fontsLoaded, fontError] = useFonts({ Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold, Poppins_800ExtraBold });
 
   // Render at once: every font has a fallback stack, and the web fonts swap in when loaded.
   // Blocking on them left the page blank for seconds on a slow phone.
@@ -46,6 +42,7 @@ function Root() {
       </Stack.Protected>
       <Stack.Protected guard={!!me?.age_verified}>
         <Stack.Screen name="pack/[id]" options={{ presentation: "fullScreenModal" }} />
+        <Stack.Screen name="reel" options={{ presentation: "fullScreenModal", animation: "fade" }} />
       </Stack.Protected>
       <Stack.Protected guard={!!me && !me.age_verified}>
         <Stack.Screen name="verify-age" />

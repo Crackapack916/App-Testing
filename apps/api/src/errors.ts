@@ -113,6 +113,7 @@ const CODES: Record<string, [number, string]> = {
   policies_not_accepted: [403, "Confirm you are 18 or older and agree to the Terms and Privacy Policy first."],
   unknown_policy: [404, "Page not found."],
   card_data_unverified: [409, "This set's card data hasn't passed its check yet, so it can't be sold. Import and check it on the Stock screen."],
+  pack_photo_required: [409, "Add the set's pack photo first (Drops, Set info). Customers always see the real pack."],
   card_data_unavailable: [503, "The card data source isn't set up."],
   card_data_import_failed: [502, "The card data import failed. Try again in a few minutes."],
   no_printings: [404, "The card data source has no printings for that set."],

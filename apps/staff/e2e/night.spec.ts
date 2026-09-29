@@ -183,6 +183,11 @@ test("put a set on sale: create, receive a box, turn it on", async ({ page }) =>
   await expect(card.getByTestId("card-data")).toContainText("not checked");
   await card.getByTestId("check-cards").click();
   await expect(card.getByTestId("card-data")).toContainText("Card data: checked, 2 printings");
+  // And customers always see the real pack: no photo, no sale.
+  await expect(card.getByTestId("toggle")).toBeDisabled();
+  await card.getByTestId("pack-photo-url").fill("/packs/fdn.jpg");
+  await card.getByTestId("save-photo").click();
+  await expect(card.getByTestId("toggle")).toBeEnabled();
   await card.getByTestId("toggle").click();
   await expect(card).toContainText("On sale");
   await shot(page, "5-stock");

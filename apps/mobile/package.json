@@ -10,9 +10,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@expo-google-fonts/fraunces": "^0.4.1",
-    "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
-    "@expo-google-fonts/instrument-sans": "^0.4.2",
+    "@expo-google-fonts/poppins": "^0.4.1",
     "expo": "~57.0.25",
     "expo-constants": "~57.0.19",
     "expo-font": "~57.0.4",

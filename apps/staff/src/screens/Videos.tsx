@@ -138,7 +138,7 @@ function Preview({ row, onClose }: { row: Row; onClose: () => void }) {
           <h2>Queue {row.position}: {row.set_name}, pack {row.pack_index} of {row.order_packs}</h2>
           <button className="ghost" onClick={onClose}>Close</button>
         </div>
-        {v.data ? <video data-testid="preview-player" src={v.data.url} poster={v.data.poster ?? undefined} controls playsInline style={{ width: "100%", borderRadius: 8, background: "#0A101A" }} /> : <p className="muted">Loading</p>}
+        {v.data ? <video data-testid="preview-player" src={v.data.url} poster={v.data.poster ?? undefined} controls playsInline style={{ width: "100%", borderRadius: 8, background: "var(--ink)" }} /> : <p className="muted">Loading</p>}
         <p className="muted small mono">SHA-256 {row.sha256}</p>
         {v.error && <div className="banner error">{v.error}</div>}
       </div>

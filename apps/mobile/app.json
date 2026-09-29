@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "crackapack",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.crackapack.app",
       "supportsTablet": false
@@ -14,7 +14,7 @@
     "android": {
       "package": "com.crackapack.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0A101A",
+        "backgroundColor": "#16141C",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -25,15 +25,15 @@
       "favicon": "./assets/images/favicon.png",
       "description": "Buy sealed Magic: The Gathering packs, opened on camera in a locked queue each night. Your cards and video land in your Vault.",
       "name": "CrackAPack",
-      "themeColor": "#0A101A",
-      "backgroundColor": "#D9DFE9"
+      "themeColor": "#16141C",
+      "backgroundColor": "#16141C"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0A101A",
+          "backgroundColor": "#16141C",
           "image": "./assets/images/icon.png",
           "imageWidth": 96
         }

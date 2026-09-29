@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { Animated, Easing, Platform, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useReducedMotion } from "../lib/motion";
-import { palette } from "../lib/theme";
+import { brand } from "../lib/theme";
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
@@ -29,7 +29,7 @@ export function FoilShimmer({ width, intensity = 1 }: { width: number; intensity
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: "hidden" }]}>
       <AnimatedGradient
-        colors={[palette.sky[100], palette.sky[200], palette.ink[100], palette.blue[200], palette.sky[300], palette.sky[100]]}
+        colors={[brand.violet, brand.magenta, brand.foil, brand.gold, brand.violet, brand.magenta]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[{ position: "absolute", top: 0, bottom: 0, left: -width * 0.5, width: width * 2 }, rainbow]}
       />

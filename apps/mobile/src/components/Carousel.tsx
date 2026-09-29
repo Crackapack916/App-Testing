@@ -138,7 +138,7 @@ const s = StyleSheet.create({
   track: { overflow: "hidden" },
   slide: { position: "absolute", left: "50%", top: 0 },
   arrow: { position: "absolute", top: "50%", marginTop: -22, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center",
-    backgroundColor: palette.ink[100], borderWidth: 1, borderColor: colors.line, zIndex: 200 },
+    backgroundColor: palette.panel, borderWidth: 1, borderColor: colors.line, zIndex: 200 },
   arrowStage: { backgroundColor: stage.panel, borderColor: stage.line },
   off: { opacity: 0.3 },
 });

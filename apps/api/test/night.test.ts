@@ -188,6 +188,9 @@ describe("catalog and products", () => {
     const check = await call("POST", "/staff/sets/eoe/card-data", { token: staff.token });
     expect(check.body).toMatchObject({ set_code: "EOE", ok: true, expected: 2 });
     expect((await call("GET", "/staff/products", { token: staff.token })).body.products[0]).toMatchObject({ card_data_ok: true, card_data_expected: 2 });
+    const noPhoto = await call("POST", `/staff/products/${product_id}/active`, { token: staff.token, body: { active: true } });
+    expect([noPhoto.status, noPhoto.body.error]).toEqual([409, "pack_photo_required"]);
+    await call("PUT", "/staff/sets/EOE", { token: staff.token, body: { wizards_info_url: null, pack_image_url: "https://img.test/eoe.jpg" } });
     await call("POST", `/staff/products/${product_id}/active`, { token: staff.token, body: { active: true } });
     const store = (await call("GET", "/storefront", { at: BEFORE })).body.products;
     expect(store[0]).toMatchObject({ name: "Edge of Eternities Play Booster", status: "available", sold_out: false, left_tonight: 6, max_qty: 6 });

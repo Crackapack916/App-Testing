@@ -20,7 +20,7 @@ export function CardImage({ card, width: outerWidth }: { card: CardLike; width: 
   const width = outerWidth - frame * 2;
   const height = Math.round(width * CARD_RATIO);
   const foil = !!card.finish && card.finish !== "nonfoil";
-  const outer = rarityColor[card.rarity] ?? palette.neutral[300];
+  const outer = rarityColor[card.rarity] ?? palette.line;
   return (
     <View style={[s.outer, { width: width + frame * 2, height: height + frame * 2, padding: frame, borderColor: outer, borderRadius: frame + 3 }]}
       accessibilityLabel={`${card.name}${foil ? `, ${card.finish}` : ""}`}>
@@ -38,9 +38,9 @@ export function CardImage({ card, width: outerWidth }: { card: CardLike; width: 
 }
 
 const s = StyleSheet.create({
-  outer: { borderWidth: 1, backgroundColor: palette.ink[100], overflow: "hidden" },
-  inner: { flex: 1, borderWidth: 1, borderColor: palette.neutral[200], overflow: "hidden", backgroundColor: palette.ink[100] },
-  placeholder: { justifyContent: "space-between", backgroundColor: palette.blue[100] },
+  outer: { borderWidth: 1, backgroundColor: palette.ink, overflow: "hidden" },
+  inner: { flex: 1, borderWidth: 1, borderColor: palette.line, overflow: "hidden", backgroundColor: palette.ink },
+  placeholder: { justifyContent: "space-between", backgroundColor: palette.panel },
   phName: { fontFamily: font.displaySemi, color: colors.text },
   phSet: { fontFamily: font.mono, color: colors.muted },
 });

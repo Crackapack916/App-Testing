@@ -4,7 +4,7 @@ import { Text } from "./Text";
 import { Button, Panel } from "./bits";
 import { useApi } from "../lib/useApi";
 import { credits, dollars } from "../lib/format";
-import { colors, font, type } from "../lib/theme";
+import { brand, colors, font, type } from "../lib/theme";
 
 type Activity = { id: number; at: string; description: string; amount: number; balance: number };
 type CreditsData = { available: number; pending: number; activity: Activity[] };
@@ -20,8 +20,8 @@ export function CreditsPanel() {
       <Text style={type.label} accessibilityRole="header">Credits</Text>
       <View>
         <Text style={type.small}>Available</Text>
-        <Text style={s.big} testID="account-credits">{credits(c?.available)} credits</Text>
-        <Text style={type.small}>{dollars(c?.available ?? 0)}</Text>
+        <Text style={s.big} testID="account-credits">{credits(c?.available)}<Text style={s.unit}> credits</Text></Text>
+        <Text style={s.dollars}>{dollars(c?.available ?? 0)}</Text>
         {c && c.pending > 0 ? <Text style={[type.small, { marginTop: 4 }]} testID="pending">Pending: {credits(c.pending)} credits</Text> : null}
       </View>
       <Text style={type.body}>{RATE_SENTENCE}</Text>
@@ -36,7 +36,7 @@ export function CreditsPanel() {
             <Text style={type.small}>{new Date(a.at).toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", year: "numeric" })}</Text>
           </View>
           <View style={{ alignItems: "flex-end", gap: 2 }}>
-            <Text style={s.amount}>{a.amount > 0 ? "+" : "−"}{credits(Math.abs(a.amount))}</Text>
+            <Text style={[s.amount, { color: a.amount > 0 ? brand.gold : brand.magenta }]}>{a.amount > 0 ? "+" : "−"}{credits(Math.abs(a.amount))}</Text>
             <Text style={type.mono}>{credits(a.balance)}</Text>
           </View>
         </View>
@@ -46,8 +46,10 @@ export function CreditsPanel() {
 }
 
 const s = StyleSheet.create({
-  big: { fontFamily: font.monoMedium, fontSize: 32, lineHeight: 40, color: colors.text },
-  row: { flexDirection: "row", gap: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.line },
+  big: { fontFamily: font.bodyBold, fontSize: 38, lineHeight: 46, color: colors.text },
+  unit: { fontFamily: font.body, fontSize: 17, color: colors.muted },
+  dollars: { fontFamily: font.bodySemi, fontSize: 13, color: brand.gold },
+  row: { flexDirection: "row", gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.line },
   desc: { fontFamily: font.bodySemi, fontSize: 14, color: colors.text },
-  amount: { fontFamily: font.monoMedium, fontSize: 14, color: colors.text },
+  amount: { fontFamily: font.bodyBold, fontSize: 14 },
 });

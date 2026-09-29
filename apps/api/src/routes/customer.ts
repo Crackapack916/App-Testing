@@ -229,7 +229,7 @@ customer.get("/me/cracked", async (c) => {
     `with last_night as (
        select o.batch_id from orders o where o.user_id = $1 and o.status = 'fulfilled' order by o.fulfilled_at desc limit 1)
      select po.id as pack_id, q.order_id, q.pack_index, o.quantity as order_packs, q.position, p.set_code, s.name as set_name,
-            b.batch_date::text, n.opened_at is null as is_new, v.status as video_status,
+            s.pack_image_url, b.batch_date::text, n.opened_at is null as is_new, v.status as video_status,
             (select count(*) from pack_contents pc where pc.pack_opening_id = po.id and pc.kind = 'card')::int as cards,
             (select coalesce(json_agg(ci.uris ->> 'small' order by pc.slot), '[]') from pack_contents pc
              join card_images ci on ci.card_id = pc.card_id where pc.pack_opening_id = po.id and pc.kind = 'card') as thumbs
@@ -253,7 +253,8 @@ customer.post("/me/cracked/seen", async (c) => {
 customer.get("/me/packs/:id", async (c) => {
   const db = c.get("db");
   const { rows: [pack] } = await db.query(
-    `select po.id, q.order_id, q.pack_index, o.quantity as order_packs, p.set_code, s.name as set_name, b.batch_date::text, v.status as video_status
+    `select po.id, q.order_id, q.pack_index, o.quantity as order_packs, p.set_code, s.name as set_name, s.pack_image_url, b.batch_date::text,
+            v.status as video_status
      from pack_openings po join queue_entries q on q.id = po.queue_entry_id join orders o on o.id = q.order_id
      join products p on p.id = o.product_id join mtg_sets s on s.code = p.set_code join batches b on b.id = po.batch_id
      left join pack_videos v on v.pack_opening_id = po.id

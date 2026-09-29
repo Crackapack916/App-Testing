@@ -5,7 +5,7 @@ import { Button, ErrorText, Panel } from "./bits";
 import { api } from "../lib/api";
 import { useApi } from "../lib/useApi";
 import { credits, pacific } from "../lib/format";
-import { colors, radius, font } from "../lib/theme";
+import { colors, radius, font, type } from "../lib/theme";
 
 type Period = "daily" | "weekly" | "monthly";
 type Limit = { period: Period; limit: number | null; spent: number; resets_at: string; pending: { limit: number | null; at: string } | null };
@@ -143,7 +143,7 @@ function LimitRow({ lim, onBreak, reload }: { lim: Limit; onBreak: boolean; relo
 }
 
 const s = StyleSheet.create({
-  label: { color: colors.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1 },
+  label: type.label,
   head: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   name: { color: colors.text, fontSize: 15, fontFamily: font.bodyBold },
   value: { color: colors.text, fontSize: 15 },

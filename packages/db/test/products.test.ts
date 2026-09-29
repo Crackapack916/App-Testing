@@ -21,7 +21,11 @@ describe("putting a set on sale", () => {
     // Section 15: no sale until the set's card data passes its check.
     await expect(db.q("select set_product_active($1, true, null)", [id])).rejects.toThrow(/card_data_unverified/);
     await db.q("update mtg_sets set card_data_ok = true where code = 'FDN'");
+    // A real pack photo is required too, and can't be removed while the set is on sale.
+    await expect(db.q("select set_product_active($1, true, null)", [id])).rejects.toThrow(/pack_photo_required/);
+    await db.q("select set_set_info('FDN', null, '/packs/fdn.jpg')");
     await db.q("select set_product_active($1, true, null)", [id]);
+    await expect(db.q("select set_set_info('FDN', null, '')")).rejects.toThrow(/pack_photo_required/);
     expect((await db.one("select available from storefront where product_id = $1", [id])).available).toBe(false); // no stock yet
   });
 

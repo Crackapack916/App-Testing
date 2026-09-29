@@ -14,7 +14,7 @@ Status key: **you** = needs your account or approval, **Claude** = can be done f
 | Variable `MAILING_ADDRESS` (step 3) | Same place, Variables tab |
 | Run **scryfall** once (it then runs daily) | Repo, Actions, scryfall, Run workflow |
 
-Before a set can go on sale, its card data must pass a check (every printing present with an image). Press **Import and check** on the staff Stock screen, or run **scryfall** with the set code. The daily run re-imports and checks every set on sale.
+Before a set can go on sale, its card data must pass a check (every printing present with an image), and it needs its real pack photo (staff Stock screen, Pack photo URL). Press **Import and check** on the staff Stock screen, or run **scryfall** with the set code. The daily run re-imports and checks every set on sale.
 
 The **jobs** workflow runs every 15 minutes: locks queues at 7:00 PM PT, releases held sell backs, and sends drop reminders and break ended emails. It skips quietly until `NEON_DATABASE_URL` exists.
 
@@ -74,7 +74,7 @@ One Vercel project, `crackapack-preview`, built by `scripts/build-preview.mjs`: 
 
 ## 6. What only you can supply
 
-* Names and set codes of the two test sets, and each set's official pack photo URL and Wizards "What's in a pack" link (staff site, Drops, Set info).
+* Names and set codes of the two test sets, and each set's official pack photo URL (staff Stock screen; Foundations already has one) and Wizards "What's in a pack" link (staff site, Drops, Set info).
 * Drop dates and times (staff site, Drops).
 * Confirmation of the pack ladder (1 pack 1,000 credits, 3 at 950, 6 at 900). Change it on the Stock screen.
 * The mailing address and the Gmail app password (step 3).

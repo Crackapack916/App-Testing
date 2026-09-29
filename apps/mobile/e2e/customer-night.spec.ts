@@ -83,6 +83,7 @@ test("a customer's night: order, get cracked, watch, vault, ship, search", async
   await expect(page.getByTestId("account-credits")).toHaveText("2,450 credits");
   await expect(page.getByTestId("activity-row").first()).toContainText("Bought 3 packs Foundations");
   await expect(page.getByTestId("order-queued")).toContainText("sealed, in tonight's queue");
+  await shot(page, "m5-account");
 
   // Tonight happens. The Vault tab gets its dot.
   await runNight(request);
@@ -95,15 +96,35 @@ test("a customer's night: order, get cracked, watch, vault, ship, search", async
   await expect(page.getByTestId("cracked-today")).toContainText("Foundations");
   await expect(page.getByTestId("new-banner")).toBeVisible();
   await expect(page.getByTestId("vault-dot")).toHaveCount(0);
-  await expect(page.getByTestId("vault-value")).toHaveText("$63.90");
+  await expect(page.getByTestId("vault-count")).toContainText("cards. Market prices from Scryfall");
+  await expect(page.getByText("Estimated market value")).toHaveCount(0);   // no value headline
   await shot(page, "m3-vault");
 
-  // Watch a pack: its video, and its cards in the order they came out.
+  // Cracked today opens a reel, one pack per swipe: the filmed video first.
   await page.locator("[data-testid^=watch-]").first().click();
-  await expect(page.getByTestId("pack-video").locator("video")).toHaveAttribute("src", /\/videos\/local\/packs\/.+\.mp4\?exp=\d+&sig=[0-9a-f]{64}/);
+  await expect(page.getByTestId("reel-count")).toHaveText("1 / 3");
+  await expect(page.getByTestId("reel-video").first().locator("video")).toHaveAttribute("src", /\/videos\/local\/packs\/.+\.mp4\?exp=\d+&sig=[0-9a-f]{64}/);
+  await shot(page, "m4-reel-video");
+  // The quick reveal shows the same logged cards, in pulled order. A tap shows them all.
+  await page.getByTestId("mode-reveal").click();
+  const reveal = page.getByTestId("reel-reveal").first();
+  await expect(reveal.getByTestId("reveal-card-3")).toBeVisible();
+
+  // A tap anywhere shows every card at once (a real tap at the middle of the reveal).
+  const box = (await reveal.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.getByTestId("reveal-replay").first()).toBeVisible();
+  await shot(page, "m4-reel-reveal");
+  // Next pack: a swipe on a phone, the down key on a keyboard.
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("reel-count")).toHaveText("2 / 3");
+  // The plain list: the Watch page with the video and the cards with prices.
+  await page.locator("[data-testid^=reel-cards-]").nth(1).click();
+  await expect(page.getByTestId("pack-video").locator("video")).toBeVisible();
   await expect(page.getByTestId("pack-card-3")).toBeVisible();
   await shot(page, "m4-pack");
   await page.getByRole("button", { name: "Close" }).click();
+  await page.getByTestId("reel-close").click();
 
   // Sell back is off for the test run: keep cards in the vault or ship them.
   // Ship the commons: 5 x $3.50 = $17.50, under $50, so 499 credits shipping.
@@ -125,6 +146,8 @@ test("a customer's night: order, get cracked, watch, vault, ship, search", async
   // Search: legality and prices from the catalog.
   await page.getByTestId("tab-search").click();
   await page.getByTestId("search").fill("sheol");
+  await expect(page.getByTestId("result-FDN-101")).toBeVisible();
+  await shot(page, "m6-search");
   await page.getByTestId("result-FDN-101").click();
   await expect(page.getByTestId("card-name")).toContainText("Sheoldred, the Apocalypse");
   await expect(page.getByTestId("card-legalities")).toContainText("standard");

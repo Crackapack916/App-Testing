@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
-import { Check, LayoutGrid, List } from "../../components/icons";
+import { Check, LayoutGrid, List, Play, Sparkles } from "../../components/icons";
 import { Image } from "expo-image";
 import { Text, TextInput } from "../../components/Text";
 import { SignInPrompt } from "../../components/SignInPrompt";
-import { Button, EmptyState, ErrorText, Footer, Panel, RarityPill, Screen, Title } from "../../components/bits";
+import { Button, Chip, EmptyState, ErrorText, Footer, Panel, RarityPill, Screen, Title } from "../../components/bits";
 import { CardImage } from "../../components/CardImage";
 import { Carousel } from "../../components/Carousel";
 import { api } from "../../lib/api";
 import { useApi } from "../../lib/useApi";
 import { useSession } from "../../lib/session";
 import { credits, dollars } from "../../lib/format";
-import { colors, font, palette, radii, rarityRank, type } from "../../lib/theme";
+import { brand, colors, font, palette, radii, rarityRank, type } from "../../lib/theme";
 
 type Holding = { card_id: string; finish: string; condition: string; qty: number; individual_card_id: string | null; market_cents: number | null;
   price_asof: string | null; name: string; set_code: string; set_name: string; collector_number: string; rarity: string; released_at: string | null;
@@ -98,34 +98,36 @@ function VaultScreen() {
   const contentWidth = Math.min(width, 1100) - 32;
   const tile = Math.floor((contentWidth - (cols - 1) * 12) / cols);
   const packs = cracked.data?.packs ?? [];
+  const scroll = useRef<ScrollView>(null);
+  const [listY, setListY] = useState(0);
+  const openReel = (p: Cracked, mode: "video" | "reveal") => router.push({ pathname: "/reel", params: { start: p.pack_id, mode } });
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ paddingBottom: chosen.length ? 110 : 24 }}>
+      <ScrollView ref={scroll} contentContainerStyle={{ paddingBottom: chosen.length ? 110 : 24 }}>
         <View style={s.wrap}>
           <Title>Vault</Title>
 
           {packs.length > 0 && (
             <View style={s.cracked} testID="cracked-today">
               <View style={s.rowBetween}>
-                <Text style={[type.label, { color: palette.blue[200] }]}>{packs[0].batch_date === new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) ? "Cracked today" : `Cracked ${packs[0].batch_date}`}</Text>
+                <Text style={type.label}>{packs[0].batch_date === new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) ? "Cracked today" : `Cracked ${packs[0].batch_date}`}</Text>
                 {packs.some((p) => p.is_new) && <View style={s.newBanner} testID="new-banner"><Text style={s.newText}>New</Text></View>}
               </View>
               <Carousel label="Cracked today" items={packs} keyOf={(p) => p.pack_id} labelOf={(p) => `${p.set_name}, pack ${p.pack_index} of ${p.order_packs}`}
-                itemWidth={Math.min(300, width * 0.62)} height={190} render={(p) => <PackTile p={p} />} />
+                itemWidth={Math.min(340, width - 160)} height={140} render={(p) => <PackTile p={p} onOpen={(mode) => openReel(p, mode)} />} />
+              <Text style={s.skip} accessibilityRole="link" testID="skip-to-cards" onPress={() => scroll.current?.scrollTo({ y: listY, animated: true })}>
+                Skip to my cards
+              </Text>
             </View>
           )}
 
           <View style={s.header}>
-            <View style={s.value}>
-              <Text style={type.label}>Estimated market value (not credit)</Text>
-              <Text style={s.valueNum} testID="vault-value">{dollars(vault.data?.total_market_cents ?? 0)}</Text>
-              <Text style={type.small}>{all.reduce((n, c) => n + c.qty, 0)} cards. Market prices from Scryfall, updated daily.</Text>
-            </View>
+            <Text style={type.small} testID="vault-count">{all.reduce((n, c) => n + c.qty, 0)} cards. Market prices from Scryfall, updated daily.</Text>
           </View>
 
-          <View style={s.tools}>
-            <TextInput value={q} onChangeText={setQ} placeholder="Search your vault" placeholderTextColor={colors.muted} style={s.search}
+          <View style={s.tools} onLayout={(e) => setListY(e.nativeEvent.layout.y)}>
+            <TextInput value={q} onChangeText={setQ} placeholder="Search your vault" placeholderTextColor={colors.fieldHint} style={s.field}
               accessibilityLabel="Search your vault" testID="vault-search" />
             <View style={s.toolRow}>
               <Chip on={showFilters} onPress={() => setShowFilters(!showFilters)} label="Filters" testID="vault-filters" />
@@ -180,7 +182,7 @@ function VaultScreen() {
                         <Text style={s.price}>{dollars(c.market_cents)}</Text>
                         {c.finish !== "nonfoil" ? <Text style={s.foil}>{c.finish === "etched" ? "Etched" : "Foil"}</Text> : null}
                         {c.qty > 1 ? <Text style={s.qty}>x{c.qty}</Text> : null}
-                        {on ? <Check size={16} color={colors.link} /> : null}
+                        {on ? <Check size={16} color={brand.magenta} /> : null}
                       </View>
                     </Pressable>
                   ) : (
@@ -220,12 +222,14 @@ function VaultScreen() {
   );
 }
 
-function PackTile({ p }: { p: Cracked }) {
+/** One cracked pack: its real cards in pulled order, and the choice of how to see them. */
+function PackTile({ p, onOpen }: { p: Cracked; onOpen: (mode: "video" | "reveal") => void }) {
+  const ready = p.video_status === "approved";
   return (
     <View style={s.packTile} testID={`pack-${p.pack_id}`}>
       <View style={s.rowBetween}>
         <View style={{ flex: 1 }}>
-          <Text style={type.h3} numberOfLines={1}>{p.set_name}</Text>
+          <Text style={type.h2} numberOfLines={1}>{p.set_name}</Text>
           <Text style={type.small}>Pack {p.pack_index} of {p.order_packs}, {p.cards} cards</Text>
         </View>
         {p.is_new && <View style={s.newBanner}><Text style={s.newText}>New</Text></View>}
@@ -233,17 +237,13 @@ function PackTile({ p }: { p: Cracked }) {
       <View style={s.thumbs}>
         {p.thumbs.slice(0, 7).map((t, i) => <Image key={i} source={t} style={s.thumb} contentFit="cover" accessibilityIgnoresInvertColors />)}
       </View>
-      <Button testID={`watch-${p.pack_id}`} label="Watch" onPress={() => router.push({ pathname: "/pack/[id]", params: { id: p.pack_id } })}
-        style={{ alignSelf: "flex-start" }} disabled={p.video_status !== "approved"} />
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <Button testID={`watch-${p.pack_id}`} label="Watch" icon={<Play size={14} color={colors.accentInk} fill={colors.accentInk} />}
+          onPress={() => onOpen("video")} style={{ flex: 1, minHeight: 44, paddingHorizontal: 10 }} disabled={!ready} />
+        <Button testID={`reveal-${p.pack_id}`} kind="ghost" label="Reveal" icon={<Sparkles size={15} color={brand.gold} />}
+          onPress={() => onOpen("reveal")} style={{ flex: 1, minHeight: 44, paddingHorizontal: 10 }} disabled={!ready} />
+      </View>
     </View>
-  );
-}
-
-function Chip({ on, onPress, label, testID }: { on: boolean; onPress: () => void; label: string; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} style={[s.chip, on && s.chipOn]} accessibilityRole="button" accessibilityState={{ selected: on }} testID={testID}>
-      <Text style={[s.chipText, on && { color: colors.skyInk }]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -343,7 +343,7 @@ function ShipSheet({ items, shipping, onClose, onDone }: { items: { h: Holding; 
   };
   const field = (k: keyof typeof addr, label: string, auto: string) => (
     <TextInput testID={`addr-${k}`} value={addr[k]} onChangeText={(v) => setAddr({ ...addr, [k]: v })} placeholder={label} accessibilityLabel={label}
-      placeholderTextColor={colors.muted} style={s.search} autoComplete={auto as never} />
+      placeholderTextColor={colors.faint} style={s.search} autoComplete={auto as never} />
   );
   return (
     <Sheet onClose={onClose}>
@@ -385,37 +385,36 @@ function Sheet({ children, onClose }: { children: ReactNode; onClose: () => void
 
 const s = StyleSheet.create({
   wrap: { maxWidth: 1100, width: "100%", alignSelf: "center" },
-  cracked: { marginHorizontal: 16, marginBottom: 12, padding: 12, gap: 8, backgroundColor: palette.blue[700], borderRadius: radii.panel },
-  packTile: { flex: 1, backgroundColor: palette.ink[100], borderRadius: radii.tile, padding: 12, gap: 8, borderWidth: 1, borderColor: palette.blue[300] },
-  thumbs: { flexDirection: "row", gap: 4 },
-  thumb: { width: 30, height: 42, borderRadius: 2, backgroundColor: palette.blue[100] },
-  newBanner: { backgroundColor: palette.sky[200], borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 2 },
-  newText: { fontFamily: font.bodyBold, fontSize: 12, color: palette.blue[700], letterSpacing: 0.6 },
+  cracked: { marginHorizontal: 16, marginBottom: 16, padding: 12, gap: 10, backgroundColor: brand.ink, borderRadius: radii.panel + 4,
+    borderWidth: 1, borderColor: colors.line },
+  packTile: { backgroundColor: colors.panel, borderRadius: radii.panel, padding: 14, gap: 10, borderWidth: 1.5, borderColor: brand.magenta },
+  thumbs: { flexDirection: "row", gap: 5 },
+  thumb: { width: 32, height: 44, borderRadius: 4, backgroundColor: colors.panelHi, borderWidth: 1, borderColor: colors.line },
+  newBanner: { backgroundColor: brand.magenta, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 2 },
+  newText: { fontFamily: font.bodyBold, fontSize: 11, color: colors.accentInk, letterSpacing: 1.2, textTransform: "uppercase" },
+  skip: { fontFamily: font.bodyMedium, fontSize: 13, color: colors.muted, textDecorationLine: "underline", alignSelf: "center", paddingVertical: 8 },
   header: { paddingHorizontal: 16, marginBottom: 8 },
-  value: { gap: 2, borderLeftWidth: 4, borderLeftColor: colors.sky, paddingLeft: 12, paddingVertical: 4 },
-  valueNum: { fontFamily: font.monoMedium, fontSize: 24, color: colors.text },
   tools: { paddingHorizontal: 16, gap: 8, marginBottom: 12 },
   toolRow: { flexDirection: "row", gap: 6, alignItems: "center", flexWrap: "wrap" },
   wrapRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
-  search: { backgroundColor: palette.ink[100], borderWidth: 1, borderColor: colors.lineStrong, borderRadius: radii.control, paddingHorizontal: 12,
+  field: { backgroundColor: colors.field, borderRadius: radii.control, paddingHorizontal: 14, minHeight: 46, fontSize: 15, color: colors.fieldInk },
+  search: { backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: radii.control, paddingHorizontal: 12,
     minHeight: 44, fontSize: 16, color: colors.text },
-  chip: { borderWidth: 1, borderColor: colors.lineStrong, borderRadius: radii.pill, paddingHorizontal: 12, minHeight: 36, justifyContent: "center", backgroundColor: palette.ink[100] },
-  chipOn: { backgroundColor: colors.sky, borderColor: colors.sky },
-  chipText: { fontFamily: font.bodySemi, fontSize: 13, color: colors.text },
-  iconBtn: { width: 40, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 6 },
+  chipOn: { backgroundColor: palette.panelHi },
+  iconBtn: { width: 40, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 10 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   under: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  price: { fontFamily: font.displaySemi, fontSize: 15, color: colors.text },
-  foil: { fontFamily: font.bodySemi, fontSize: 11, color: colors.muted, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 3, paddingHorizontal: 4 },
+  price: { fontFamily: font.bodyMedium, fontSize: 13, color: colors.muted },
+  foil: { fontFamily: font.bodySemi, fontSize: 10.5, color: colors.text, borderWidth: 1, borderColor: brand.violet, borderRadius: 4, paddingHorizontal: 4 },
   qty: { fontFamily: font.mono, fontSize: 12, color: colors.muted },
-  on: { backgroundColor: palette.sky[100], borderRadius: 6 },
+  on: { backgroundColor: "rgba(255, 61, 129, 0.16)", borderRadius: 8 },
   listRow: { flexDirection: "row", gap: 12, alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line },
-  name: { fontFamily: font.bodySemi, fontSize: 15, color: colors.text },
+  name: { fontFamily: font.bodySemi, fontSize: 14.5, color: colors.text },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
-  mono: { fontFamily: font.monoMedium, fontSize: 14, color: colors.text },
-  bar: { position: "absolute", left: 12, right: 12, bottom: 12, backgroundColor: palette.ink[100], borderRadius: radii.control, borderWidth: 1.5,
-    borderColor: palette.blue[400], padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center", maxWidth: 700, alignSelf: "center" },
-  scrim: { flex: 1, backgroundColor: "rgba(10, 16, 26, 0.6)" },
-  sheet: { backgroundColor: palette.ink[100], borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, paddingBottom: 32, maxHeight: "88%",
-    maxWidth: 640, width: "100%", alignSelf: "center" },
+  mono: { fontFamily: font.bodyBold, fontSize: 14, color: brand.gold },
+  bar: { position: "absolute", left: 12, right: 12, bottom: 12, backgroundColor: colors.panel, borderRadius: radii.panel, borderWidth: 1.5,
+    borderColor: brand.magenta, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center", maxWidth: 700, alignSelf: "center" },
+  scrim: { flex: 1, backgroundColor: "rgba(10, 8, 16, 0.7)" },
+  sheet: { backgroundColor: colors.panel, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 32, maxHeight: "88%",
+    maxWidth: 640, width: "100%", alignSelf: "center", borderWidth: 1, borderColor: colors.line },
 });

@@ -7,7 +7,7 @@ import { ErrorText, Footer, Stage, SUPPORT_EMAIL } from "../../components/bits";
 import { CardImage } from "../../components/CardImage";
 import { api } from "../../lib/api";
 import { dollars } from "../../lib/format";
-import { font, radii, stage } from "../../lib/theme";
+import { brand, colors, font, radii, type } from "../../lib/theme";
 
 type Card = { slot: number; card_id: string; finish: string; name: string; set_code: string; collector_number: string; rarity: string;
   market_cents: number | null; image_url: string | null };
@@ -15,8 +15,8 @@ type Pack = { id: string; pack_index: number; order_packs: number; set_code: str
 type Video = { url: string; poster: string | null; content_type: string };
 
 /**
- * One cracked pack: the video of it being opened, then its cards in the order they came out
- * of the pack. No timed beats and no sounds: the video is the reveal.
+ * Watch: one cracked pack's filmed video, then its cards in the order they came out of the
+ * pack, with market prices. No "best pull" or value headline.
  */
 export default function PackScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,11 +38,11 @@ export default function PackScreen() {
         <View style={s.wrap}>
           <View style={s.head}>
             <View style={{ flex: 1 }}>
-              <Text style={s.h1} accessibilityRole="header">{pack ? pack.pack.set_name : " "}</Text>
-              {pack && <Text style={s.muted}>Pack {pack.pack.pack_index} of {pack.pack.order_packs}, opened {pack.pack.batch_date}</Text>}
+              <Text style={type.h1} accessibilityRole="header">Watch</Text>
+              {pack && <Text style={s.muted}>{pack.pack.set_name} · Pack {pack.pack.pack_index} of {pack.pack.order_packs} · opened {pack.pack.batch_date}</Text>}
             </View>
             <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => (router.canGoBack() ? router.back() : router.replace("/vault"))} style={s.close}>
-              <X size={22} color={stage.text} />
+              <X size={22} color={colors.text} />
             </Pressable>
           </View>
           <View style={s.video} testID="pack-video">
@@ -51,7 +51,7 @@ export default function PackScreen() {
                   style: { width: "100%", height: "100%", backgroundColor: "#000", borderRadius: 8 }, "aria-label": "Video of this pack being opened" })
               : <Text style={s.muted}>{error ?? "Loading video"}</Text>}
           </View>
-          <Text style={s.section}>Cards, in the order they came out</Text>
+          <Text style={type.label}>Your {pack?.cards.length ?? ""} cards, in the order they came out</Text>
           <View style={s.grid}>
             {pack?.cards.map((c) => (
               <Pressable key={c.slot} style={{ width: tile }} onPress={() => router.push(`/card/${c.card_id}`)} accessibilityRole="button" testID={`pack-card-${c.slot}`}>
@@ -66,7 +66,7 @@ export default function PackScreen() {
             Report a problem with this pack
           </Text>
         </View>
-        <Footer onStage />
+        <Footer />
       </ScrollView>
     </Stage>
   );
@@ -74,13 +74,12 @@ export default function PackScreen() {
 
 const s = StyleSheet.create({
   wrap: { maxWidth: 900, width: "100%", alignSelf: "center", paddingHorizontal: 16, gap: 12 },
-  head: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 12 },
-  h1: { fontFamily: font.display, fontSize: 24, color: stage.text },
-  muted: { fontFamily: font.body, fontSize: 13, color: stage.muted },
-  close: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: stage.line },
-  video: { aspectRatio: 16 / 9, width: "100%", backgroundColor: stage.panel, borderRadius: radii.tile, alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  section: { fontFamily: font.bodySemi, fontSize: 12, letterSpacing: 1.2, textTransform: "uppercase", color: stage.muted, marginTop: 8 },
+  head: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 14 },
+  muted: { fontFamily: font.body, fontSize: 13, color: colors.muted },
+  close: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.line },
+  video: { aspectRatio: 16 / 9, width: "100%", backgroundColor: brand.ink, borderRadius: radii.panel, alignItems: "center", justifyContent: "center",
+    overflow: "hidden", borderWidth: 1, borderColor: colors.line },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  report: { fontFamily: font.bodySemi, fontSize: 14, color: stage.accent, textDecorationLine: "underline", paddingVertical: 12 },
-  price: { fontFamily: font.displaySemi, fontSize: 14, color: stage.text, marginTop: 4 },
+  report: { fontFamily: font.bodySemi, fontSize: 13.5, color: colors.link, textDecorationLine: "underline", paddingVertical: 12 },
+  price: { fontFamily: font.bodyMedium, fontSize: 12.5, color: colors.muted, marginTop: 4 },
 });

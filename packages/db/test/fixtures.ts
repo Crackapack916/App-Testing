@@ -16,7 +16,8 @@ export async function makeUser(db: Db, opts: { credits?: number; verified?: bool
 export async function makeProduct(db: Db, opts: { setCode?: string; boxes?: number; packsPerBox?: number; buffer?: number } = {}) {
   const code = opts.setCode ?? "FDN";
   // Test sets count as having checked card data (section 15); card-data.test.ts covers the check itself.
-  await db.q("insert into mtg_sets (code, name, card_data_ok) values ($1, $1, true) on conflict (code) do update set card_data_ok = true", [code]);
+  await db.q(`insert into mtg_sets (code, name, card_data_ok, pack_image_url) values ($1, $1, true, $2)
+    on conflict (code) do update set card_data_ok = true, pack_image_url = coalesce(mtg_sets.pack_image_url, excluded.pack_image_url)`, [code, `/packs/${code.toLowerCase()}.jpg`]);
   const p = await db.one(
     `insert into products (set_code, booster_type, name, active, safety_buffer_packs)
      values ($1, 'play', $1 || ' Play Booster', true, $2) returning id`,

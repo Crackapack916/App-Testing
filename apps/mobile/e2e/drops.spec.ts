@@ -5,7 +5,8 @@ const API = "http://localhost:8789";
 // Item 14: a guest sees when a set goes live, counts down on server time, and can add it to a calendar.
 test("a guest sees an upcoming drop with a countdown on server time and calendar links", async ({ page, request }) => {
   const staff = await (await request.post(`${API}/dev/login`, { data: { email: "ops@e2e.test", role: "staff" } })).json();
-  // M10 isn't on sale in the other specs, so this drop never gates their orders.
+  // M10 isn't on sale in the other specs, so this drop never gates their orders. A drop needs the set's real pack photo.
+  await request.put(`${API}/staff/sets/M10`, { headers: { authorization: `Bearer ${staff.token}` }, data: { pack_image_url: "/packs/fdn.jpg" } });
   const r = await request.post(`${API}/staff/drops`, { headers: { authorization: `Bearer ${staff.token}` },
     data: { set_code: "M10", starts_at: "2026-10-03T12:00:00-07:00", packs_allocated: 60, status: "published" } });
   expect(r.ok(), await r.text()).toBeTruthy();

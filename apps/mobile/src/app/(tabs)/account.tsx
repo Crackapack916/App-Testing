@@ -34,7 +34,7 @@ function AccountScreen() {
     <Screen>
       <ScrollView>
         <View style={s.wrap}>
-          <Title sub={me?.email}>Account</Title>
+          <Title sub={me?.email} balance={false}>Account</Title>
           <View style={s.cols}>
             <View style={s.col}>
               <CreditsPanel />
@@ -83,5 +83,5 @@ const s = StyleSheet.create({
   cols: { flexDirection: "row", flexWrap: "wrap", gap: 16, paddingHorizontal: 16 },
   col: { flexGrow: 1, flexBasis: 340, gap: 16 },
   order: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.line },
-  body: { fontFamily: font.bodySemi, fontSize: 15, color: colors.text },
+  body: { fontFamily: font.bodySemi, fontSize: 14.5, color: colors.text },
 });

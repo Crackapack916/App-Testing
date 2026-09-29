@@ -10,7 +10,7 @@ import { api } from "../lib/api";
 import { useApi } from "../lib/useApi";
 import { useSession } from "../lib/session";
 import { credits, dollars } from "../lib/format";
-import { colors, font, palette, radii, type } from "../lib/theme";
+import { brand, colors, font, palette, radii, type } from "../lib/theme";
 
 type Bundle = { key: string; credits: number; packs: number };
 
@@ -35,7 +35,7 @@ export default function AddCredits() {
       <ScrollView>
         <View style={s.wrap}>
           <View style={s.head}>
-            <Title>Add credits</Title>
+            <View style={{ flex: 1 }}><Title>Add credits</Title></View>
             <Pressable accessibilityRole="button" accessibilityLabel="Close" style={s.close}
               onPress={() => (router.canGoBack() ? router.back() : router.replace("/account"))}><X size={22} color={colors.text} /></Pressable>
           </View>
@@ -72,10 +72,10 @@ export default function AddCredits() {
 
 const s = StyleSheet.create({
   wrap: { maxWidth: 560, width: "100%", alignSelf: "center" },
-  head: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingRight: 16 },
   close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  bundle: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radii.tile, borderWidth: 1.5, borderColor: colors.line, backgroundColor: palette.ink[100] },
-  bundleOn: { borderColor: palette.blue[500], backgroundColor: palette.sky[100] },
-  num: { fontFamily: font.monoMedium, fontSize: 18, color: colors.text },
-  price: { fontFamily: font.displaySemi, fontSize: 18, color: colors.text },
+  head: { flexDirection: "row", alignItems: "center", paddingRight: 16 },
+  bundle: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: radii.panel, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel },
+  bundleOn: { borderColor: brand.magenta, borderWidth: 2, backgroundColor: palette.panelHi },
+  num: { fontFamily: font.bodyBold, fontSize: 18, color: brand.gold },
+  price: { fontFamily: font.bodyBold, fontSize: 18, color: colors.text },
 });

@@ -7,6 +7,7 @@ type Product = {
   id: string; name: string; set_code: string; set_name: string; booster_type: string; active: boolean;
   packs_on_hand: number; packs_reserved: number; sealed_boxes: number; safety_buffer_packs: number; ladder: Tier[] | null;
   card_data_ok: boolean; card_data_checked_at: string | null; card_data_problem: string | null; card_data_expected: number;
+  pack_image_url: string | null; wizards_info_url: string | null;
 };
 type SetRow = { code: string; name: string; release_date: string | null };
 
@@ -77,14 +78,18 @@ function ProductCard({ p, reload }: { p: Product; reload: () => void }) {
   });
   // Section 15: a set sells only after every printing is in our database with an image.
   const checkCards = () => run(async () => { await api("POST", `/staff/sets/${p.set_code}/card-data`); reload(); });
+  // Customers always see the real pack: no photo, no sale.
+  const [photo, setPhoto] = useState(p.pack_image_url ?? "");
+  const savePhoto = () => run(async () => { await api("PUT", `/staff/sets/${p.set_code}`, { wizards_info_url: p.wizards_info_url, pack_image_url: photo }); reload(); });
+  const ready = p.card_data_ok && !!p.pack_image_url;
   const saveLadder = () => run(async () => { await api("PUT", `/staff/products/${p.id}/ladder`, { ladder }); setLadder(null); reload(); });
 
   return (
     <section className="panel" data-testid={`product-${p.set_code}`}>
       <div className="row-between">
         <h2>{p.name} <span className="mono muted">{p.set_code}</span></h2>
-        <button className={p.active ? "ghost" : "primary"} disabled={busy || (!p.active && !p.card_data_ok)} onClick={toggle} data-testid="toggle"
-          title={!p.active && !p.card_data_ok ? "Import and check the card data first" : undefined}>
+        <button className={p.active ? "ghost" : "primary"} disabled={busy || (!p.active && !ready)} onClick={toggle} data-testid="toggle"
+          title={!p.active && !ready ? "Check the card data and add the pack photo first" : undefined}>
           {p.active ? "Take off sale" : "Put on sale"}
         </button>
       </div>
@@ -101,6 +106,13 @@ function ProductCard({ p, reload }: { p: Product; reload: () => void }) {
             {busy ? "Importing" : "Import and check"}
           </button>
         </div>
+      </div>
+      <div className={`banner photo ${p.pack_image_url ? "" : "warn"}`} data-testid="pack-photo">
+        {p.pack_image_url ? <img src={p.pack_image_url} alt={`${p.name} pack`} /> : null}
+        <label>Pack photo URL {p.pack_image_url ? "" : "(needed before this set can go on sale)"}
+          <input value={photo} onChange={(e) => setPhoto(e.target.value)} placeholder="Official product photo of the sealed pack" data-testid="pack-photo-url" />
+        </label>
+        <button disabled={busy || photo === (p.pack_image_url ?? "")} onClick={savePhoto} data-testid="save-photo">Save photo</button>
       </div>
       <div className="stats">
         <div className="stat"><div className="label">Status</div><div className="value">{p.active ? (available ? "On sale" : "Sold out") : "Off sale"}</div></div>
