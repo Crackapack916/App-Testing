@@ -1,4 +1,3 @@
-import { RecDot } from "../icons";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { shortId, useAction, useData, useHotkeys } from "../hooks";
@@ -43,7 +42,7 @@ export function Session({ batch, reload }: { batch: TonightData["batch"]; reload
 
   useHotkeys({ space: () => openPack(), b: () => openBox(), v: () => next?.open_box && setVoiding(true) }, !voiding);
 
-  if (!sessionId) return <p className="muted">No session running. Lock the queue and start the session from Tonight. A night whose session has ended is finished on Log cards (L) and Videos (N).</p>;
+  if (!sessionId) return <p className="muted">Not opening yet. Lock the queue and press Start opening on Tonight. A night that's finished opening is completed on Log cards (L) and Videos (N).</p>;
   if (!s.data) return <p className="muted">Loading…</p>;
   const { session, recent } = s.data;
 
@@ -51,8 +50,8 @@ export function Session({ batch, reload }: { batch: TonightData["batch"]; reload
     <div className="session">
       <div className="session-bar">
         {ended
-          ? <span className="ended" data-testid="session-ended">Session ended {new Date(session.ended_at!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · {elapsed} recorded</span>
-          : <span className="rec"><RecDot /> REC {elapsed}</span>}
+          ? <span className="ended" data-testid="session-ended">Finished opening at {new Date(session.ended_at!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+          : <span className="ended">Opening · {elapsed}</span>}
         <span>{session.opened} / {session.total} packs</span>
         <div className="progress"><div style={{ width: `${(100 * session.opened) / Math.max(1, session.total)}%` }} /></div>
         <span className="mono muted" title="Queue manifest hash">#{session.manifest_hash.slice(0, 12)}</span>
@@ -82,12 +81,12 @@ export function Session({ batch, reload }: { batch: TonightData["batch"]; reload
       ) : (
         <section className="next done">
           <div className="who">
-            <div className="product">{ended ? "Session ended" : "Queue complete"}</div>
+            <div className="product">{ended ? "Opening finished" : "Queue complete"}</div>
             <div className="customer">{ended
               ? "Every pack was opened. Finish on Log cards (L) and Videos (N), then approve and notify customers."
-              : "Every pack tonight has been opened. End the session to stop the recording."}</div>
+              : "Every pack tonight has been opened. Press Finish opening, then log cards and upload a video for each pack."}</div>
           </div>
-          {!session.ended_at && <button className="primary huge" disabled={busy} onClick={complete} data-testid="complete">End session</button>}
+          {!session.ended_at && <button className="primary huge" disabled={busy} onClick={complete} data-testid="complete">Finish opening</button>}
         </section>
       )}
 

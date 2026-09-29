@@ -31,7 +31,7 @@ describe("drops over HTTP", () => {
     const staff = await login("ops@x.test", "staff");
     const bad = await json("POST", "/staff/drops", { token: staff.token, body: { set_code: "EEE", starts_at: "2026-10-01T12:00:00-07:00", ends_at: "2026-10-01T11:00:00-07:00", packs_allocated: 10, status: "published" } });
     expect(bad.body.error).toBe("invalid_drop_window");
-    const { id } = (await json("POST", "/staff/drops", { token: staff.token, body: { set_code: "eee", starts_at: "2026-10-01T12:00:00-07:00", packs_allocated: 10, per_customer_limit: 3, status: "published" } })).body;
+    const { id } = (await json("POST", "/staff/drops", { token: staff.token, body: { set_code: "eee", starts_at: "2026-10-01T12:00:00-07:00", packs_allocated: 10, status: "published" } })).body;
 
     const list = (await json("GET", "/drops", { at: MORNING })).body;
     expect(list.now).toBe("2026-10-01T16:00:00.000Z");
@@ -46,17 +46,21 @@ describe("drops over HTTP", () => {
     expect(text).toContain("DTSTART:20261001T190000Z");
     expect(text).toContain("URL:https://crackapack.test/drops");
 
-    // Storefront: upcoming before the window, then available up to the drop's own limit.
+    // Storefront: upcoming before the window, then six packs of the set for the whole night.
     expect((await json("GET", "/storefront", { at: MORNING })).body.products[0]).toMatchObject({ product_id: p, status: "upcoming", max_qty: 0 });
     const u = await login("u@x.test");
     await db.q("select purchase_credits($1, 20000, 'seed')", [u.user_id]);
-    expect((await json("GET", "/storefront", { token: u.token, at: LIVE })).body.products[0]).toMatchObject({ status: "available", left_for_you: 3, max_qty: 3 });
-    await json("POST", "/orders", { token: u.token, at: LIVE, body: { product_id: p, quantity: 3 } });
-    expect((await json("GET", "/storefront", { token: u.token, at: LIVE })).body.products[0]).toMatchObject({ status: "limit_reached", left_for_you: 0 });
+    expect((await json("GET", "/storefront", { token: u.token, at: LIVE })).body.products[0]).toMatchObject({ status: "available", left_tonight: 6, night_limit: 6, max_qty: 6 });
+    await json("POST", "/orders", { token: u.token, at: LIVE, body: { product_id: p, quantity: 4 } });
+    const v = await login("v@x.test");
+    await db.q("select purchase_credits($1, 20000, 'seed-v')", [v.user_id]);
+    expect((await json("GET", "/storefront", { token: v.token, at: LIVE })).body.products[0]).toMatchObject({ status: "available", left_tonight: 2, max_qty: 2 });
+    const vo = await json("POST", "/orders", { token: v.token, at: LIVE, body: { product_id: p, quantity: 2 } });
+    expect(vo.status, JSON.stringify(vo.body)).toBe(201);
     const over = await json("POST", "/orders", { token: u.token, at: LIVE, body: { product_id: p, quantity: 1 } });
-    expect([over.status, over.body.error]).toEqual([409, "set_limit_reached"]);
-    // Guests still see it as available.
-    expect((await json("GET", "/storefront", { at: LIVE })).body.products[0].status).toBe("available");
+    expect([over.status, over.body.error]).toEqual([409, "night_set_limit_reached"]);
+    // Everyone, guests included, sees the same nightly count.
+    expect((await json("GET", "/storefront", { at: LIVE })).body.products[0]).toMatchObject({ status: "night_full", left_tonight: 0 });
   });
 
   it("takes an email reminder opt in and unsubscribes from the emailed link without signing in", async () => {

@@ -190,7 +190,7 @@ describe("catalog and products", () => {
     expect((await call("GET", "/staff/products", { token: staff.token })).body.products[0]).toMatchObject({ card_data_ok: true, card_data_expected: 2 });
     await call("POST", `/staff/products/${product_id}/active`, { token: staff.token, body: { active: true } });
     const store = (await call("GET", "/storefront", { at: BEFORE })).body.products;
-    expect(store[0]).toMatchObject({ name: "Edge of Eternities Play Booster", status: "available", sold_out: false, left_for_you: 6, max_qty: 6 });
+    expect(store[0]).toMatchObject({ name: "Edge of Eternities Play Booster", status: "available", sold_out: false, left_tonight: 6, max_qty: 6 });
     expect(store[0]).not.toHaveProperty("stock");
     expect(store[0].ladder.map((t: any) => t.per_pack_credits)).toEqual([1000, 950, 900]);
   });
@@ -211,7 +211,7 @@ describe("a full night over the API", () => {
 
     // Storefront and ordering.
     const store = await call("GET", "/storefront", { at: BEFORE });
-    expect(store.body.products[0]).toMatchObject({ product_id: p, status: "available", left_for_you: 6 });
+    expect(store.body.products[0]).toMatchObject({ product_id: p, status: "available", left_tonight: 6 });
     const oA = (await call("POST", "/orders", { token: alice.token, at: "2026-10-01T10:00:00-07:00", body: { product_id: p, quantity: 2 } })).body.order_id;
     const oB = (await call("POST", "/orders", { token: bob.token, at: "2026-10-01T11:00:00-07:00", body: { product_id: p, quantity: 1 } })).body.order_id;
     expect((await call("GET", "/me", { token: alice.token })).body.credits.total).toBe(10_000 - 1800);

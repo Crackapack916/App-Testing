@@ -589,23 +589,6 @@ staff.post("/sets/:code/card-data", async (c) => {
   }
 });
 
-// Per set limit override for one customer, with a reason (logged, append only).
-staff.post("/set-limits", async (c) => {
-  const b = await c.req.json<{ email: string; set_code: string; max_packs: number; reason: string }>();
-  const db = c.get("db");
-  const { rows: [u] } = await db.query("select id from users where lower(email) = lower($1)", [b.email ?? ""]);
-  if (!u) throw new ApiError("unknown_user");
-  await db.query("select set_customer_set_limit($1, $2, $3, $4, $5)", [u.id, b.set_code, b.max_packs, b.reason, c.get("user").id]);
-  return c.json({ ok: true });
-});
-
-staff.get("/set-limits", async (c) => {
-  const { rows } = await c.get("db").query(
-    `select o.id, u.email, o.set_code, o.max_packs, o.reason, a.email as actor, o.created_at
-     from set_limit_overrides o join users u on u.id = o.user_id join users a on a.id = o.actor order by o.id desc limit 100`);
-  return c.json({ overrides: rows, default_limit: (await c.get("db").query("select max_packs_per_set_per_customer as n from system_config")).rows[0].n });
-});
-
 // Drops (item 14) -------------------------------------------------------------------------
 
 staff.get("/drops", async (c) => {

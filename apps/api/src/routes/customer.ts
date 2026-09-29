@@ -22,21 +22,22 @@ customer.get("/storefront", async (c) => {
              from price_tiers t where t.product_id = p.id) as ladder,
             d.id as drop_id, d.starts_at as drop_starts_at, d.ends_at as drop_ends_at, d.state as drop_state,
             greatest(0, d.packs_allocated - packs_sold_in_drop(d.id)) as drop_remaining,
-            case when $1::uuid is null then 0 else packs_held_in_set($1, p.set_code) end as held,
-            case when $1::uuid is null then (cfg()).max_packs_per_set_per_customer else set_limit_for($1, p.set_code) end as set_limit
+            packs_in_night_for_set((select id from batch_for_time(app_now())), p.set_code) as night_taken,
+            (cfg()).max_packs_per_set_per_night as night_limit
      from products p join mtg_sets s on s.code = p.set_code
      left join lateral (
        select x.*, drop_state(x) as state from drops x where x.set_code = p.set_code and x.status = 'published'
        order by (x.ends_at is not null and x.ends_at <= app_now()),
                 case when x.ends_at is not null and x.ends_at <= app_now() then -extract(epoch from x.starts_at) else extract(epoch from x.starts_at) end
        limit 1) d on true
-     where p.active order by d.starts_at nulls first, s.name`, [user?.id ?? null]);
+     where p.active order by d.starts_at nulls first, s.name`);
   const { rows: [meta] } = await db.query(
     `select b.batch_date::text, b.cutoff_at, app_now() as now, (cfg()).max_packs_per_order as max_per_order,
             (select break_until from spend_limits where user_id = $1 and break_until > app_now()) as break_until
      from batch_for_time(app_now()) b`, [user?.id ?? null]);
   const products = rows.map((r) => {
-    const left = Math.max(0, r.set_limit - r.held);
+    // Six packs per set per night, across every customer.
+    const left = Math.max(0, r.night_limit - r.night_taken);
     const room = Math.min(left, r.stock, r.drop_id ? r.drop_remaining : Infinity, meta.max_per_order);
     // One status per set, first match wins, so the page shows one clear reason.
     const status = !r.card_data_ok ? "unavailable"
@@ -44,9 +45,9 @@ customer.get("/storefront", async (c) => {
       : r.drop_state === "upcoming" ? "upcoming"
       : r.drop_state === "ended" ? "ended"
       : r.stock <= 0 || r.drop_state === "sold_out" ? "sold_out"
-      : left <= 0 ? "limit_reached"
+      : left <= 0 ? "night_full"
       : "available";
-    return { ...r, drop_remaining: undefined, stock: undefined, card_data_ok: undefined, sold_out: r.stock <= 0, left_for_you: left,
+    return { ...r, drop_remaining: undefined, stock: undefined, card_data_ok: undefined, night_taken: undefined, sold_out: r.stock <= 0, left_tonight: left,
       max_qty: status === "available" ? room : 0, status };
   });
   // `now` lets the app count down on the server's clock, not the phone's.

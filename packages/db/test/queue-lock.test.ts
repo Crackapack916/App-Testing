@@ -144,6 +144,8 @@ describe("before the lock", () => {
 
 describe("concurrency at the cutoff", () => {
   it("never loses or strands an order when purchases race the lock", async () => {
+    // 40 buyers: this checks the lock and stock, not the nightly six (sets-drops.test.ts), so lift the cap.
+    await db.q("update system_config set max_packs_per_set_per_night = 1000");
     const p = await makeProduct(db, { boxes: 10 });
     const staff = await makeStaff(db);
     const users = await Promise.all(Array.from({ length: 40 }, () => makeUser(db, { credits: 20_000 })));
@@ -173,6 +175,8 @@ describe("concurrency at the cutoff", () => {
   });
 
   it("never oversells sealed stock", async () => {
+    // 40 buyers: this checks the lock and stock, not the nightly six (sets-drops.test.ts), so lift the cap.
+    await db.q("update system_config set max_packs_per_set_per_night = 1000");
     const p = await makeProduct(db, { boxes: 1, packsPerBox: 30, buffer: 2 }); // 28 sellable
     const users = await Promise.all(Array.from({ length: 40 }, () => makeUser(db, { credits: 5_000 })));
     const results = await Promise.allSettled(users.map((u) => order(BEFORE_CUTOFF, u, p)));

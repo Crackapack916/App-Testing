@@ -80,6 +80,10 @@ One Vercel project, `crackapack-preview`, built by `scripts/build-preview.mjs`: 
 * The mailing address and the Gmail app password (step 3).
 * The city of the business address (Elk Grove or City of Sacramento) for the local license.
 
+## Planned after the test
+
+* Close pack purchases from 7:00 PM to 7:00 AM Pacific (Tyson wants to be awake while orders come in, at least at first). Not built yet.
+
 ## Sell back switch
 
 Sell back is off for the test run; customers keep cards in the vault or ship them. To turn it on later (Neon SQL editor): `update system_config set buyback_enabled = true;` The site shows Sell back as soon as it is on.

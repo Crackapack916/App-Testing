@@ -26,9 +26,8 @@ test("a full night: lock, film in strict order, log cards, upload videos, approv
   await expect(queue.locator("tbody tr td:first-child")).toHaveText(["1", "2", "3"]);
   await shot(page, "1-tonight-locked");
 
-  // Start the filmed session.
+  // Start opening (each pack is recorded on a phone and uploaded later, one video per pack).
   await setTime(page, "2026-10-01T19:10:00-07:00");
-  await page.getByLabel("Stream or recording URL").fill("https://stream.e2e/night.m3u8");
   await page.getByTestId("start").click();
 
   // Session: B opens the box on camera, Space cracks the next pack in queue order.

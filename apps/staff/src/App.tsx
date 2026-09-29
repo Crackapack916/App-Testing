@@ -25,7 +25,7 @@ export type TonightData = {
 
 const TABS = [
   { key: "t", id: "tonight", label: "Tonight" },
-  { key: "s", id: "session", label: "Session" },
+  { key: "s", id: "session", label: "Opening" },
   { key: "l", id: "log", label: "Log cards" },
   { key: "n", id: "videos", label: "Videos" },
   { key: "d", id: "drops", label: "Drops" },

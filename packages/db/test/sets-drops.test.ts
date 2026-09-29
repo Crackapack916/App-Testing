@@ -9,34 +9,31 @@ afterEach(async () => { await db.close(); });
 const order = (u: string, p: string, qty: number, at = BEFORE_CUTOFF) =>
   atTime(db, at, "select place_order($1, $2, $3) as id", [u, p, qty]).then((r) => r[0].id as string);
 
-describe("six packs per set per customer (item 5)", () => {
-  it("counts every pending order across days, releases on cancel, and allows a logged staff override", async () => {
-    const u = await makeUser(db, { credits: 50_000 });
+describe("six packs per set per night, across every customer", () => {
+  it("caps each night's queue at six packs of a set, per set, and resets for the next night", async () => {
+    const [a, b] = [await makeUser(db, { credits: 50_000 }), await makeUser(db, { credits: 50_000 })];
     const p = await makeProduct(db, { setCode: "AAA", boxes: 2 });
-    await order(u, p, 3);
-    await order(u, p, 2, "2026-10-02T10:00:00-07:00");                 // another day still counts
-    await expect(order(u, p, 2, "2026-10-02T10:00:00-07:00")).rejects.toThrow(/set_limit_reached/);
-    const last = await order(u, p, 1, "2026-10-02T10:00:00-07:00");    // 6 of 6
-    await expect(order(u, p, 1, "2026-10-02T10:00:00-07:00")).rejects.toThrow(/set_limit_reached/);
-    await atTime(db, "2026-10-02T10:00:00-07:00", "select cancel_order($1, $2)", [last, u]);
-    await expect(order(u, p, 1, "2026-10-02T10:00:00-07:00")).resolves.toBeTruthy();
-    // Another set has its own six.
+    await order(a, p, 4);
+    await expect(order(b, p, 3)).rejects.toThrow(/night_set_limit_reached/);   // 4 + 3 > 6
+    const last = await order(b, p, 2);                                         // 6 of 6
+    await expect(order(a, p, 1)).rejects.toThrow(/night_set_limit_reached/);
+    // A cancelled order frees its packs for the night.
+    await atTime(db, BEFORE_CUTOFF, "select cancel_order($1, $2)", [last, b]);
+    await expect(order(a, p, 2)).resolves.toBeTruthy();
+    // Another set has its own six; the next night starts again at zero; one customer can take all six.
     const other = await makeProduct(db, { setCode: "BBB" });
-    await expect(order(u, other, 6, "2026-10-02T10:00:00-07:00")).resolves.toBeTruthy();
-    // Staff override with a reason.
-    const staff = await makeStaff(db);
-    await expect(db.q("select set_customer_set_limit($1, 'aaa', 8, ' ', $2)", [u, staff])).rejects.toThrow(/reason_required/);
-    await db.q("select set_customer_set_limit($1, 'aaa', 8, 'Test buyer, approved by Tyson', $2)", [u, staff]);
-    await expect(order(u, p, 2, "2026-10-02T10:00:00-07:00")).resolves.toBeTruthy();
-    await expect(db.q("delete from set_limit_overrides")).rejects.toThrow(/append_only/);
+    await expect(order(a, p, 1, "2026-10-01T19:05:00-07:00")).resolves.toBeTruthy();   // after the cutoff: tomorrow's night
+    await expect(order(b, other, 6)).resolves.toBeTruthy();
+    expect(await db.q("select count(*)::int as n from set_limit_overrides")).toEqual([{ n: 0 }]);
   });
 
-  it("never lets one customer pass six with concurrent purchases", async () => {
-    const u = await makeUser(db, { credits: 90_000 });
+  it("never lets a night pass six packs of a set when many customers buy at once", async () => {
     const p = await makeProduct(db, { setCode: "CCC", boxes: 2 });
-    const results = await Promise.allSettled(Array.from({ length: 10 }, () => order(u, p, 1)));
+    const users = await Promise.all(Array.from({ length: 12 }, () => makeUser(db, { credits: 20_000 })));
+    const results = await Promise.allSettled(users.map((u) => order(u, p, 1)));
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(6);
-    expect(results.filter((r) => r.status === "rejected").every((r) => /set_limit_reached/.test(String((r as PromiseRejectedResult).reason)))).toBe(true);
+    expect(results.filter((r) => r.status === "rejected").every((r) => /night_set_limit_reached/.test(String((r as PromiseRejectedResult).reason)))).toBe(true);
+    expect(await db.one("select packs_reserved from product_stock where product_id = $1", [p])).toEqual({ packs_reserved: 6 });
   });
 
   it("never oversells the last sealed packs when many customers buy at once", async () => {
@@ -56,7 +53,6 @@ describe("drops (item 14)", () => {
     await db.q(`insert into drops (set_code, starts_at, ends_at, packs_allocated, per_customer_limit, status)
                 values ('EEE', '2026-10-01T12:00:00-07:00', '2026-10-01T18:00:00-07:00', 5, 3, 'published')`);
     await expect(order(a, p, 1, "2026-10-01T11:59:00-07:00")).rejects.toThrow(/drop_not_live/);
-    await expect(order(a, p, 4, "2026-10-01T12:00:00-07:00")).rejects.toThrow(/set_limit_reached/);   // drop limit 3
     await order(a, p, 3, "2026-10-01T12:00:00-07:00");
     await expect(order(b, p, 3, "2026-10-01T12:05:00-07:00")).rejects.toThrow(/sold_out/);           // 5 allocated
     await order(b, p, 2, "2026-10-01T12:05:00-07:00");

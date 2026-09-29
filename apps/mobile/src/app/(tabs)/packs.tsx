@@ -15,10 +15,10 @@ import { credits, dollars, pacific } from "../../lib/format";
 import { font, palette, radii, stage, type } from "../../lib/theme";
 
 type Tier = { min_qty: number; per_pack_credits: number };
-type Status = "available" | "sold_out" | "limit_reached" | "upcoming" | "ended" | "on_break" | "unavailable";
+type Status = "available" | "sold_out" | "night_full" | "upcoming" | "ended" | "on_break" | "unavailable";
 export type Product = { product_id: string; set_code: string; set_name: string; booster_type: string; name: string; icon_svg_uri: string | null;
   wizards_info_url: string | null; pack_image_url: string | null; ladder: Tier[]; drop_id: string | null; drop_starts_at: string | null;
-  drop_ends_at: string | null; drop_state: string | null; held: number; set_limit: number; left_for_you: number; max_qty: number; status: Status };
+  drop_ends_at: string | null; drop_state: string | null; night_limit: number; left_tonight: number; max_qty: number; status: Status };
 type Storefront = { products: Product[]; next_cutoff: string; batch_date: string; now: string; break_until: string | null };
 
 const CHIPS = [1, 3, 6];
@@ -118,9 +118,9 @@ export default function Packs() {
               </>
             ) : <StateNote p={p} breakUntil={store.data?.break_until ?? null} />}
 
-            {me && p.status !== "on_break" ? (
-              <Text style={s.muted} testID="set-limit">You have {p.left_for_you} of {p.set_limit} available for {p.set_name}.</Text>
-            ) : !me ? <Text style={s.muted}>Each customer can buy up to {p.set_limit} packs of {p.set_name} during the test run.</Text> : null}
+            {p.status !== "on_break" && p.status !== "unavailable" ? (
+              <Text style={s.muted} testID="set-limit">{p.left_tonight} of {p.night_limit} {p.set_name} packs left for tonight's rip.</Text>
+            ) : null}
 
             {store.data && (
               <Text style={s.cutoff} testID="cutoff">
@@ -162,7 +162,7 @@ export default function Packs() {
 function StateNote({ p, breakUntil }: { p: Product; breakUntil: string | null }) {
   const note: Record<Exclude<Status, "available">, { title: string; body: string; action?: { label: string; to: string } }> = {
     sold_out: { title: "Sold out", body: `There are no sealed ${p.set_name} packs left.`, action: { label: "See drops", to: "/drops" } },
-    limit_reached: { title: "Limit reached", body: `You have all ${p.set_limit} of your ${p.set_name} packs for this test run.` },
+    night_full: { title: "Tonight's packs are taken", body: `All ${p.night_limit} ${p.set_name} packs for tonight's rip are ordered. Orders after 7:00 PM PT go into tomorrow night's rip.` },
     upcoming: { title: "Next drop", body: p.drop_starts_at ? `Goes live ${pacific(p.drop_starts_at)} PT.` : "Coming soon.", action: { label: "See drops", to: "/drops" } },
     ended: { title: "This drop has ended", body: "See Drops for what's next.", action: { label: "See drops", to: "/drops" } },
     unavailable: { title: "Temporarily unavailable", body: `${p.set_name} can't be ordered right now. Check back soon.` },

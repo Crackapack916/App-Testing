@@ -92,6 +92,7 @@ const CODES: Record<string, [number, string]> = {
   unknown_notification: [404, "Notification not found."],
   // sets, drops and videos
   set_limit_reached: [409, "That would pass your limit for this set."],
+  night_set_limit_reached: [409, "Tonight's packs of this set are taken. Orders after 7:00 PM PT go into tomorrow night's rip."],
   drop_not_live: [409, "This set isn't on sale right now. See Drops for when it opens."],
   unknown_drop: [404, "Drop not found."],
   drop_overlap: [409, "Another published drop for this set overlaps that window."],

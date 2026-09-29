@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { api, testClock } from "../api";
 import { shortId, useAction } from "../hooks";
 import type { TonightData } from "../App";
@@ -6,7 +5,6 @@ import { BreakRequests } from "./BreakRequests";
 
 /** Pre session: the queue for tonight, sealed stock, and the lock. */
 export function Tonight({ data, reload, goSession }: { data: TonightData | null; reload: () => void; goSession: () => void }) {
-  const [streamRef, setStreamRef] = useState("");
   const { busy, error, run } = useAction();
   if (!data) return <p className="muted">Loading…</p>;
   const { batch, queue, stock, upcoming } = data;
@@ -17,7 +15,7 @@ export function Tonight({ data, reload, goSession }: { data: TonightData | null;
 
   const lock = () => run(async () => { await api("POST", `/staff/batches/${batch!.id}/lock`); reload(); });
   const start = () => run(async () => {
-    await api("POST", `/staff/batches/${batch!.id}/sessions`, { stream_ref: streamRef || null });
+    await api("POST", `/staff/batches/${batch!.id}/sessions`, {});
     reload();
     goSession();
   });
@@ -73,14 +71,12 @@ export function Tonight({ data, reload, goSession }: { data: TonightData | null;
           {batch.status === "locked" && (
             <div className="action">
               <p>Queue locked. Manifest <code data-testid="manifest">{batch.manifest_hash}</code></p>
-              <label>Stream or recording URL
-                <input value={streamRef} onChange={(e) => setStreamRef(e.target.value)} placeholder="https://… (from OBS / Mux)" />
-              </label>
-              <button className="primary big" disabled={busy} onClick={start} data-testid="start">Start filmed session</button>
+              <p className="muted">Open the packs in queue order, recording each one on your phone. You'll upload one video per pack on Videos (N).</p>
+              <button className="primary big" disabled={busy} onClick={start} data-testid="start">Start opening</button>
             </div>
           )}
           {batch.status === "in_session" && (
-            <div className="action"><button className="primary big" onClick={goSession}>Go to session</button></div>
+            <div className="action"><button className="primary big" onClick={goSession}>Continue opening</button></div>
           )}
           {error && <div className="banner error">{error}</div>}
         </section>

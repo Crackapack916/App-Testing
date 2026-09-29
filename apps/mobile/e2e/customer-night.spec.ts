@@ -58,7 +58,7 @@ test("a customer's night: order, get cracked, watch, vault, ship, search", async
   await expect(page.getByTestId("cutoff")).toContainText("Order by 7:00 PM PT to be in tonight's rip. 4h 0m");
   await expect(page.getByTestId("balance")).toHaveText("5,000");
   await expect(page.getByTestId("product-FDN")).toContainText("900 credits a pack");
-  await expect(page.getByTestId("set-limit")).toHaveText("You have 6 of 6 available for Foundations.");
+  await expect(page.getByTestId("set-limit")).toHaveText("6 of 6 Foundations packs left for tonight's rip.");
   await shot(page, "m1-packs");
 
   // Three packs at the 3 pack price. A first order suggests a spending limit, gently.
@@ -76,7 +76,7 @@ test("a customer's night: order, get cracked, watch, vault, ship, search", async
   await expect(page.getByTestId("placed")).toContainText("still sealed");
   await page.getByRole("button", { name: "Done" }).click();
   await expect(page.getByTestId("balance")).toHaveText("2,450");
-  await expect(page.getByTestId("set-limit")).toHaveText("You have 3 of 6 available for Foundations.");
+  await expect(page.getByTestId("set-limit")).toHaveText("3 of 6 Foundations packs left for tonight's rip.");
 
   // Account: the credits activity and the order, sealed in tonight's queue.
   await page.getByTestId("tab-account").click();
