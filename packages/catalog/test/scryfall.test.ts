@@ -3,6 +3,7 @@ import { freshDb, type Db } from "../../db/test/db";
 import { importScryfallBulk, scryfallProvider } from "../src/provider";
 import { HEADERS, limiter, mapScryfallCard, type ScryfallCard } from "../src/scryfall";
 import { readFileSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 
 // Real printings fetched from Scryfall by .github/workflows/scryfall.yml (fixtures job).
 const F = (n: string) => new URL(`./fixtures/scryfall/${n}`, import.meta.url).pathname;
@@ -77,5 +78,38 @@ describe("bulk import and search on our own database", () => {
     expect((await search("lightnin bolt"))[0].name).toBe("Lightning Bolt");      // typo still finds it
     expect((await search("delver"))[0].name).toBe("Delver of Secrets // Insectile Aberration");
     expect(await db.one("select lower(f_unaccent('Lim-Dûl')) as f")).toEqual({ f: "lim-dul" });
+  });
+});
+
+// Scryfall now publishes the daily bulk file as JSON Lines (jsonl_download_uri), sometimes gzipped.
+describe("the JSON Lines bulk file (Scryfall's current format)", () => {
+  let db: Db;
+  beforeAll(async () => { db = await freshDb(); });
+  afterAll(async () => { await db.close(); });
+
+  const jsonl = real.slice(0, 40).map((c) => JSON.stringify(c)).join("\n") + "\n";
+  const kept = real.slice(0, 40).filter((c) => mapScryfallCard(c)).length;   // the same cards the array import keeps
+  const bulkList = { object: "list", data: [
+    { object: "bulk_data", type: "oracle_cards", uri: "https://api.scryfall.com/bulk-data/o", jsonl_download_uri: "https://data.scryfall.io/o.jsonl" },
+    { object: "bulk_data", id: "d", type: "default_cards", updated_at: "2026-09-29T09:00:00Z", uri: "https://api.scryfall.com/bulk-data/d",
+      name: "Default Cards", description: "", jsonl_download_uri: "https://data.scryfall.io/default-cards.jsonl.gz", compressed_size: 1 },
+  ] };
+  const sets = JSON.parse(readFileSync(F("sets.json"), "utf8"));
+  const fakeFetch = (file: Uint8Array) => (async (url: string) => {
+    if (url.endsWith("/sets")) return new Response(JSON.stringify(sets));
+    if (url.endsWith("/bulk-data")) return new Response(JSON.stringify(bulkList));
+    if (url.includes("default-cards")) return new Response(new Blob([new Uint8Array(file)]));
+    return new Response("not found", { status: 404 });
+  }) as unknown as typeof fetch;
+
+  it("downloads jsonl_download_uri and imports gzipped JSON Lines", async () => {
+    const r = await importScryfallBulk(db.pool, { fetchImpl: fakeFetch(gzipSync(jsonl)) });
+    expect(r.rows).toBe(kept);
+    expect((await db.one("select status, rows from import_runs order by id desc limit 1"))).toEqual({ status: "succeeded", rows: kept });
+  });
+
+  it("also takes plain JSON Lines and the older JSON array", async () => {
+    expect((await importScryfallBulk(db.pool, { fetchImpl: fakeFetch(Buffer.from(jsonl)) })).rows).toBe(kept);
+    expect((await importScryfallBulk(db.pool, { fetchImpl: fakeFetch(Buffer.from(JSON.stringify(real.slice(0, 40)))) })).rows).toBe(kept);
   });
 });

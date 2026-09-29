@@ -7,7 +7,7 @@ import { Readable } from "node:stream";
 import { createReadStream } from "node:fs";
 import type pg from "pg";
 import { mapScryfallCard, scryfallClient, type ScryfallRow } from "./scryfall";
-import { streamBulk } from "./scryfall-bulk";
+import { streamBulkAny } from "./scryfall-bulk";
 export { scryfallProvider, type CardDataProvider, type LookupResult } from "./lookup";
 
 const BATCH = 2000;
@@ -41,7 +41,7 @@ export async function importScryfallBulk(pool: pg.Pool, opts: { file?: string; s
       n += r.n; batch = [];
       log(`imported ${n} printings`);
     };
-    for await (const card of streamBulk(body)) {
+    for await (const card of streamBulkAny(body)) {
       const row = mapScryfallCard(card);
       if (!row) continue;
       batch.push(row);
