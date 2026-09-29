@@ -265,6 +265,15 @@ describe("a full night over the API", () => {
     expect((await call("GET", "/staff/tonight", { token: staff.token, at: DURING(9) })).body.batch).toMatchObject({ id: batchId, status: "completed" });
     expect((await call("POST", `/staff/batches/${batchId}/approve`, { token: staff.token, at: DURING(9) })).body.error).toBe("videos_not_ready");
 
+    // The ended session shows as ended, and an unfinished night never blocks the next one.
+    const ended = (await call("GET", `/staff/sessions/${sessionId}`, { token: staff.token, at: DURING(9) })).body.session;
+    expect(ended.ended_at).toBeTruthy();
+    expect(Number(ended.duration_ms)).toBe(9 * 60_000);   // started 19:10, ended 19:19
+    await call("POST", "/orders", { token: bob.token, at: "2026-10-02T10:00:00-07:00", body: { product_id: p, quantity: 1 } });
+    const next = (await call("GET", "/staff/tonight", { token: staff.token, at: "2026-10-02T19:01:00-07:00" })).body;
+    expect(next.batch).toMatchObject({ batch_date: "2026-10-02", status: "open" });
+    expect(next.unfinished.map((b: any) => [b.id, b.orders_waiting])).toEqual([[batchId, 2]]);
+
     // Videos: one per pack, straight to storage; the API checks the stored size and the path.
     const sha = "ab".repeat(32);
     for (const [i, pk] of logList.entries()) {
@@ -289,6 +298,7 @@ describe("a full night over the API", () => {
     expect((await call("GET", "/staff/tonight", { token: staff.token, at: DURING(11) })).body.batch).toBeNull();
     expect(emails.map((e) => [e.kind, e.to])).toEqual([
       ["order_confirmation", "alice@x.test"], ["order_confirmation", "bob@x.test"],
+      ["order_confirmation", "bob@x.test"],               // bob's order for the next night
       ["staff_alert", "crackapack.business@gmail.com"],   // the night is ready to approve
       ["pack_cracked", "alice@x.test"], ["pack_cracked", "bob@x.test"]]);
 

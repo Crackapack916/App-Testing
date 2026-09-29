@@ -17,6 +17,8 @@ export type TonightData = {
     entry_count: number | null; session_id: string | null;
   };
   upcoming: { id: string; batch_date: string; cutoff_at: string; packs: number };
+  /** Earlier nights whose session ended but whose orders still wait on videos, logging or approval. */
+  unfinished: (NonNullable<TonightData["batch"]> & { orders_waiting: number })[];
   queue: { id: string; position: number | null; status: string; pack_index: number; quantity: number; order_id: string; customer: string; product: string }[];
   stock: { product_id: string; name: string; packs_on_hand: number; packs_reserved: number; safety_buffer_packs: number; sealed_boxes: number }[];
 };
@@ -42,6 +44,10 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   const [tab, setTab] = useState<Tab>("tonight");
   const tonight = useData<TonightData>("/staff/tonight", 5000);
   const batch = tonight.data?.batch ?? null;
+  // Log cards and Videos can work on tonight or on an earlier night that still needs finishing.
+  const nights = [...(tonight.data?.unfinished ?? []), ...(batch ? [batch] : [])].filter((b, i, all) => all.findIndex((x) => x.id === b.id) === i);
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const workBatch = nights.find((b) => b.id === pickedId) ?? batch ?? nights[0] ?? null;
   // useHotkeys ignores keys typed into inputs, so tab keys never fire while logging.
   useHotkeys(Object.fromEntries(TABS.map((t) => [t.key, () => setTab(t.id)])));
 
@@ -65,8 +71,17 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
       <main>
         {tab === "tonight" && <Tonight data={tonight.data} reload={tonight.reload} goSession={() => setTab("session")} />}
         {tab === "session" && <Session batch={batch} reload={tonight.reload} />}
-        {tab === "log" && <LogCards batch={batch} />}
-        {tab === "videos" && <Videos batch={batch} />}
+        {(tab === "log" || tab === "videos") && nights.length > 1 && (
+          <div className="banner warn night-picker">
+            <label>Night
+              <select value={workBatch?.id ?? ""} onChange={(e) => setPickedId(e.target.value)} data-testid="night-picker">
+                {nights.map((b) => <option key={b.id} value={b.id}>{b.batch_date}{b.status === "completed" ? " (session ended, still to finish)" : " (tonight)"}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+        {tab === "log" && <LogCards batch={workBatch} />}
+        {tab === "videos" && <Videos batch={workBatch} />}
         {tab === "drops" && <Drops />}
         {tab === "stock" && <Stock />}
         {tab === "ship" && <Ship />}

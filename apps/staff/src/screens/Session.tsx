@@ -5,7 +5,7 @@ import { shortId, useAction, useData, useHotkeys } from "../hooks";
 import type { TonightData } from "../App";
 
 type SessionData = {
-  session: { id: string; batch_date: string; manifest_hash: string; offset_ms: string; opened: number; total: number; ended_at: string | null };
+  session: { id: string; batch_date: string; manifest_hash: string; offset_ms: string; opened: number; total: number; ended_at: string | null; duration_ms: string | null };
   next: null | {
     position: number; pack_index: number; quantity: number; order_id: string; product_id: string; product: string; customer: string;
     open_box: null | { id: string; label: string; packs_opened: number; pack_count: number };
@@ -26,7 +26,8 @@ export function Session({ batch, reload }: { batch: TonightData["batch"]; reload
   const { busy, error, run } = useAction();
   const [voiding, setVoiding] = useState(false);
   const [reason, setReason] = useState("");
-  const elapsed = useElapsed(s.data?.session.offset_ms);
+  const ended = !!s.data?.session.ended_at;
+  const elapsed = useElapsed(s.data?.session.offset_ms, ended ? s.data?.session.duration_ms ?? 0 : undefined);
 
   const next = s.data?.next ?? null;
   const needsBox = !!next && !next.open_box;
@@ -49,7 +50,9 @@ export function Session({ batch, reload }: { batch: TonightData["batch"]; reload
   return (
     <div className="session">
       <div className="session-bar">
-        <span className="rec"><RecDot /> REC {elapsed}</span>
+        {ended
+          ? <span className="ended" data-testid="session-ended">Session ended {new Date(session.ended_at!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · {elapsed} recorded</span>
+          : <span className="rec"><RecDot /> REC {elapsed}</span>}
         <span>{session.opened} / {session.total} packs</span>
         <div className="progress"><div style={{ width: `${(100 * session.opened) / Math.max(1, session.total)}%` }} /></div>
         <span className="mono muted" title="Queue manifest hash">#{session.manifest_hash.slice(0, 12)}</span>
@@ -78,7 +81,12 @@ export function Session({ batch, reload }: { batch: TonightData["batch"]; reload
         </section>
       ) : (
         <section className="next done">
-          <div className="who"><div className="product">Queue complete</div><div className="customer">Every pack tonight has been opened.</div></div>
+          <div className="who">
+            <div className="product">{ended ? "Session ended" : "Queue complete"}</div>
+            <div className="customer">{ended
+              ? "Every pack was opened. Finish on Log cards (L) and Videos (N), then approve and notify customers."
+              : "Every pack tonight has been opened. End the session to stop the recording."}</div>
+          </div>
           {!session.ended_at && <button className="primary huge" disabled={busy} onClick={complete} data-testid="complete">End session</button>}
         </section>
       )}
@@ -126,10 +134,11 @@ function fmt(ms: number) {
 }
 
 /** Recording clock, anchored to the server's offset so it matches clip marks. */
-function useElapsed(serverOffsetMs?: string) {
+function useElapsed(serverOffsetMs?: string, fixedMs?: string | number) {
   const [base, setBase] = useState({ ms: 0, at: Date.now() });
   const [, tick] = useState(0);
   useEffect(() => { if (serverOffsetMs) setBase({ ms: Number(serverOffsetMs), at: Date.now() }); }, [serverOffsetMs]);
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(t); }, []);
+  if (fixedMs != null) return fmt(Number(fixedMs));
   return fmt(base.ms + Date.now() - base.at);
 }

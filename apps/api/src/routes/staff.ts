@@ -37,7 +37,16 @@ staff.get("/tonight", async (c) => {
        and (b.status in ('locked', 'in_session')
          or (b.status = 'open' and exists (select 1 from queue_entries q where q.batch_id = b.id and q.status <> 'cancelled'))
          or (b.status = 'completed' and exists (select 1 from orders o where o.batch_id = b.id and o.status = 'queued')))
-     order by b.batch_date limit 1`);
+     -- A night still to lock or film comes first; a finished night waiting on videos or
+     -- approval never blocks the next one (it stays reachable under "unfinished").
+     order by (b.status = 'completed'), b.batch_date limit 1`);
+  const { rows: unfinished } = await db.query(
+    `select b.id, b.batch_date::text, b.cutoff_at, b.status, b.locked_at, b.manifest_hash, b.entry_count,
+            s.id as session_id, s.started_at as session_started_at,
+            (select count(*) from orders o where o.batch_id = b.id and o.status = 'queued')::int as orders_waiting
+     from batches b left join opening_sessions s on s.batch_id = b.id
+     where b.status = 'completed' and exists (select 1 from orders o where o.batch_id = b.id and o.status = 'queued')
+     order by b.batch_date`);
   const { rows: [upcoming] } = await db.query(
     `select b.id, b.batch_date::text, b.cutoff_at,
             (select count(*) from queue_entries q where q.batch_id = b.id and q.status = 'queued')::int as packs
@@ -50,7 +59,7 @@ staff.get("/tonight", async (c) => {
      from products p join product_stock s on s.product_id = p.id order by p.name`);
   // test_clock: the staff tool may offer to run the night early (X-Test-Now). Never on a live database.
   const test_clock = !!c.get("services").testClock && clock.test_mode;
-  return c.json({ now: clock.now, test_clock, batch: batch ?? null, upcoming, queue, stock });
+  return c.json({ now: clock.now, test_clock, batch: batch ?? null, unfinished, upcoming, queue, stock });
 });
 
 async function queueOf(db: pg.PoolClient, batchId: string) {
@@ -90,6 +99,7 @@ staff.get("/sessions/:id", async (c) => {
   const id = c.req.param("id");
   const { rows: [s] } = await db.query(
     `select s.*, b.batch_date::text, b.manifest_hash, ${OFFSET_SQL} as offset_ms,
+            (extract(epoch from s.ended_at - s.started_at) * 1000)::bigint as duration_ms,
             (select count(*) from queue_entries q where q.batch_id = s.batch_id and q.status = 'opened')::int as opened,
             (select count(*) from queue_entries q where q.batch_id = s.batch_id and q.status <> 'cancelled')::int as total
      from opening_sessions s join batches b on b.id = s.batch_id where s.id = $1`, [id]);
