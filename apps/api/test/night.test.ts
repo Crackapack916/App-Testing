@@ -379,7 +379,7 @@ describe("a full night over the API", () => {
 describe("policies", () => {
   it("serves each page with its version and date, and shows sell back only when it is on", async () => {
     const list = (await call("GET", "/policies")).body.policies;
-    expect(list.map((p: any) => [p.doc, p.version])).toEqual([["fairness", "2026-10-02"], ["terms", "2026-10-02"], ["privacy", "2026-10-01"]]);
+    expect(list.map((p: any) => [p.doc, p.version])).toEqual([["fairness", "2026-10-03"], ["terms", "2026-10-02"], ["privacy", "2026-10-01"]]);
     let f = (await call("GET", "/policies/fairness")).body;
     expect(f.body_md).toContain("## Our fairness promise");
     expect(f.body_md).not.toContain("Selling cards back");

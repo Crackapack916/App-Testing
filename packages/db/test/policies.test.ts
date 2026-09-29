@@ -9,7 +9,7 @@ afterEach(async () => { await db.close(); });
 describe("policies (item 18)", () => {
   it("publishes a current, dated version of each page", async () => {
     const rows = await db.q("select doc, current_policy_version(doc) as v from (values ('fairness'), ('terms'), ('privacy')) d(doc)");
-    expect(rows).toEqual([{ doc: "fairness", v: "2026-10-02" }, { doc: "terms", v: "2026-10-02" }, { doc: "privacy", v: "2026-10-01" }]);
+    expect(rows).toEqual([{ doc: "fairness", v: "2026-10-03" }, { doc: "terms", v: "2026-10-02" }, { doc: "privacy", v: "2026-10-01" }]);
     await expect(db.q("update policy_versions set body_md = 'x'")).rejects.toThrow(/append_only/);
   });
 
@@ -18,6 +18,7 @@ describe("policies (item 18)", () => {
       .map((r) => r.body_md).join("\n");
     expect(text).toContain("up to 6 packs of each set, shared by all customers");
     expect(text).toContain("There is no limit per customer.");
+    expect(text).toContain("## Our promise to local game stores\nMagic's best moments happen at a table with friends.");
     expect(text).not.toMatch(/each customer can buy|between 7:00 and 8:00|on camera/);
   });
 
