@@ -108,7 +108,8 @@ function PackEditor({ packId, onApproved, onChange }: { packId: string; onApprov
     } else {
       await api("PUT", `/staff/packs/${packId}/cards/${nextSlot}`, body);
     }
-    setNum(""); setFound(null);
+    // Each card starts nonfoil: a foil choice must never carry over to the next card.
+    setNum(""); setFound(null); setFinish("nonfoil");
     await reload();
   });
   const add = () => { if (found && found.finishes.includes(finish)) save({ kind: "card", card_id: found.id, finish }); };

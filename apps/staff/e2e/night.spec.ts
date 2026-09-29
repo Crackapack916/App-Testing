@@ -73,6 +73,7 @@ test("a full night: lock, film in strict order, log cards, upload videos, approv
       }
       await expect(collector).toHaveValue("");
       await expect(collector).toBeFocused();
+      await expect(page.getByTestId("finish-nonfoil")).toBeChecked();   // a foil choice never carries over
     }
     if (pack === 0) {
       await page.getByTestId("add-token").click();

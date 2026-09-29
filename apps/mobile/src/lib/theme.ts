@@ -77,6 +77,20 @@ export const rarityColor: Record<string, string> = {
   bonus: "#C9A227",
 };
 
+/**
+ * Card frames by rarity, like the set symbol's own colors: a polished metal for every card.
+ * Every rarity gets the same frame shape and the same soft glow; only the color changes.
+ * Foil cards also get the shimmer (FoilShimmer) on top.
+ */
+export const rarityFrame: Record<string, [string, string, string]> = {
+  common: ["#9C98A6", "#4A4655", "#8A8699"],
+  uncommon: ["#F2F5FA", "#8FA3B8", "#DCE3EC"],
+  rare: ["#FBE39A", "#B8871F", "#F5C95A"],
+  mythic: ["#FFC27A", "#D9441F", "#FF8A3D"],
+  special: ["#D9C6FF", "#7A5CFF", "#B9A2FF"],
+  bonus: ["#D9C6FF", "#7A5CFF", "#B9A2FF"],
+};
+
 /** Sort order for the Vault's rarity sort. */
 export const rarityRank: Record<string, number> = { common: 0, uncommon: 1, rare: 2, special: 2, bonus: 2, mythic: 3 };
 
