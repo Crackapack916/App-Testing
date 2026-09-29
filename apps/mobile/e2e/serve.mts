@@ -39,6 +39,11 @@ await db.q("select record_credit_purchase($1, 5000, 'stripe', 'cs_e2e_seed')", [
 const [lim] = await db.q("insert into users (email, display_name, age_verified_at, password_hash) values ('limits@e2e.test', 'limits', now(), $1) returning id",
   [await hashPassword("limits password")]);
 await db.q("select record_credit_purchase($1, 5000, 'stripe', 'cs_e2e_seed_limits')", [lim.id]);
+// Staff accounts for the ops site (password sign in): an owner (admin) and a helper (staff).
+for (const [email, role, pw] of [["owner@e2e.test", "admin", "owner password"], ["helper@e2e.test", "staff", "helper password"]]) {
+  await db.q("insert into users (email, display_name, role, age_verified_at, password_hash) values ($1, split_part($1, '@', 1), $2, now(), $3)",
+    [email, role, await hashPassword(pw)]);
+}
 // Real printings for search (Scryfall fixtures), except FDN, whose cards the night spec defines.
 const FIX = resolve("../../packages/catalog/test/fixtures/scryfall");
 const tmp = mkdtempSync(join(tmpdir(), "scry-"));
