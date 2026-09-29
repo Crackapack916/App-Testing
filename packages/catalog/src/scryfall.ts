@@ -93,8 +93,17 @@ export function scryfallClient(fetchImpl: typeof fetch = fetch, base = SCRYFALL_
     async bulkUri(type = "default_cards"): Promise<{ uri: string; updated_at: string }> {
       const r = await get("/bulk-data");
       if (!r.ok) throw new Error(`scryfall bulk-data ${r.status}`);
-      const item = ((await r.json()) as { data: { type: string; download_uri: string; updated_at: string }[] }).data.find((d) => d.type === type);
-      if (!item) throw new Error(`no bulk file ${type}`);
+      type Item = { type: string; download_uri?: string; uri?: string; updated_at: string };
+      const body = (await r.json()) as { data?: Item[] };
+      let item = body.data?.find((d) => d.type === type);
+      if (!item) throw new Error(`no bulk file ${type} (got ${JSON.stringify(Object.keys(body))})`);
+      // The list entry normally carries download_uri; if not, its own uri returns the full object.
+      if (!item.download_uri && item.uri) {
+        const one = await limit(() => fetchImpl(item!.uri!, { headers: HEADERS }));
+        if (!one.ok) throw new Error(`scryfall bulk item ${one.status}`);
+        item = { ...item, ...((await one.json()) as Item) };
+      }
+      if (!item.download_uri) throw new Error(`bulk file ${type} has no download link (fields: ${Object.keys(item).join(", ")})`);
       return { uri: item.download_uri, updated_at: item.updated_at };
     },
     fetch: (url: string) => limit(() => fetchImpl(url, { headers: HEADERS })),

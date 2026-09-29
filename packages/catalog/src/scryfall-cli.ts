@@ -16,6 +16,7 @@ try {
   console.log(`done: ${r.rows} printings in ${Math.round((Date.now() - started) / 1000)}s`);
 } catch (e) {
   console.error(`import failed: ${(e as Error).message}`);
+  console.error((e as Error).stack);
   process.exitCode = 1;
 } finally {
   await pool.end();

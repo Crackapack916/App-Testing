@@ -20,13 +20,16 @@ export async function importScryfallBulk(pool: pg.Pool, opts: { file?: string; s
   let n = 0;
   try {
     // Sets first, so every card has its set's name and icon.
+    log("fetching sets");
     const sets = opts.setsFile ? JSON.parse(await readAll(createReadStream(opts.setsFile))).data : await client.sets();
     await pool.query("select import_scryfall_sets($1)", [JSON.stringify(sets.filter((s: { digital?: boolean }) => !s.digital))]);
 
     let body: Readable; let asof: string;
     if (opts.file) { body = createReadStream(opts.file); asof = new Date().toISOString(); }
     else {
+      log(`imported ${sets.length} sets; finding today's bulk file`);
       const bulk = await client.bulkUri();
+      log(`downloading ${bulk.uri}`);
       const res = await client.fetch(bulk.uri);
       if (!res.ok || !res.body) throw new Error(`bulk download ${res.status}`);
       body = Readable.fromWeb(res.body as never); asof = bulk.updated_at;
