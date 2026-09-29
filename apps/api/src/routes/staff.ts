@@ -35,11 +35,10 @@ staff.get("/tonight", async (c) => {
      from batches b left join opening_sessions s on s.batch_id = b.id
      where b.cutoff_at <= app_now()
        and (b.status in ('locked', 'in_session')
-         or (b.status = 'open' and exists (select 1 from queue_entries q where q.batch_id = b.id and q.status <> 'cancelled'))
-         or (b.status = 'completed' and exists (select 1 from orders o where o.batch_id = b.id and o.status = 'queued')))
-     -- A night still to lock or film comes first; a finished night waiting on videos or
-     -- approval never blocks the next one (it stays reachable under "unfinished").
-     order by (b.status = 'completed'), b.batch_date limit 1`);
+         or (b.status = 'open' and exists (select 1 from queue_entries q where q.batch_id = b.id and q.status <> 'cancelled')))
+     -- A night whose session ended but still waits on videos or approval is listed under
+     -- "unfinished" instead, so it never hides or blocks the next night.
+     order by b.batch_date limit 1`);
   const { rows: unfinished } = await db.query(
     `select b.id, b.batch_date::text, b.cutoff_at, b.status, b.locked_at, b.manifest_hash, b.entry_count,
             s.id as session_id, s.started_at as session_started_at,
@@ -52,7 +51,8 @@ staff.get("/tonight", async (c) => {
             (select count(*) from queue_entries q where q.batch_id = b.id and q.status = 'queued')::int as packs
      from batch_for_time(app_now()) b`);
   const { rows: [clock] } = await db.query("select app_now() as now, mode = 'test' as test_mode from system_config");
-  const queue = batch ? await queueOf(db, batch.id) : [];
+  // Before the cutoff there's no night to run: show the orders placed so far for the next one.
+  const queue = await queueOf(db, batch ? batch.id : upcoming.id);
   const { rows: stock } = await db.query(
     `select p.id as product_id, p.name, s.packs_on_hand, s.packs_reserved, p.safety_buffer_packs,
             (select count(*) from sealed_boxes x where x.product_id = p.id and x.status = 'sealed')::int as sealed_boxes

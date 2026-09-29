@@ -43,7 +43,7 @@ export function Session({ batch, reload }: { batch: TonightData["batch"]; reload
 
   useHotkeys({ space: () => openPack(), b: () => openBox(), v: () => next?.open_box && setVoiding(true) }, !voiding);
 
-  if (!sessionId) return <p className="muted">No session running. Lock the queue and start the session from Tonight.</p>;
+  if (!sessionId) return <p className="muted">No session running. Lock the queue and start the session from Tonight. A night whose session has ended is finished on Log cards (L) and Videos (N).</p>;
   if (!s.data) return <p className="muted">Loading…</p>;
   const { session, recent } = s.data;
 

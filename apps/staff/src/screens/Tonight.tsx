@@ -28,6 +28,12 @@ export function Tonight({ data, reload, goSession }: { data: TonightData | null;
   return (
     <div className="stack">
       <BreakRequests />
+      {data.unfinished.length > 0 && (
+        <div className="banner warn" data-testid="unfinished">
+          {data.unfinished.map((b) => `Night of ${b.batch_date}: ${b.orders_waiting} ${b.orders_waiting === 1 ? "order" : "orders"} still waiting on cards or videos.`).join(" ")}
+          {" "}Finish on Log cards (L) and Videos (N), then approve.
+        </div>
+      )}
       {!batch && (
         <section className="panel">
           <h2>Nothing to open yet</h2>
@@ -86,7 +92,7 @@ export function Tonight({ data, reload, goSession }: { data: TonightData | null;
 
       <div className="cols">
         <section className="panel grow">
-          <h2>Queue {batch?.status === "open" ? "(provisional until locked)" : ""}</h2>
+          <h2>{batch ? `Queue ${batch.status === "open" ? "(provisional until locked)" : ""}` : `Orders so far for ${upcoming.batch_date} (provisional until the cutoff)`}</h2>
           <table data-testid="queue">
             <thead><tr><th>#</th><th>Customer</th><th>Order</th><th>Product</th><th>Status</th></tr></thead>
             <tbody>

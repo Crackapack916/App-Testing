@@ -216,6 +216,11 @@ describe("a full night over the API", () => {
     const oB = (await call("POST", "/orders", { token: bob.token, at: "2026-10-01T11:00:00-07:00", body: { product_id: p, quantity: 1 } })).body.order_id;
     expect((await call("GET", "/me", { token: alice.token })).body.credits.total).toBe(10_000 - 1800);
 
+    // Before the cutoff: nothing to open yet, but the orders placed so far are listed.
+    const early = (await call("GET", "/staff/tonight", { token: staff.token, at: "2026-10-01T12:00:00-07:00" })).body;
+    expect(early.batch).toBeNull();
+    expect(early.queue.map((q: any) => q.customer)).toEqual(["alice", "alice", "bob"]);
+
     // Tonight, before and after locking.
     let tonight = await call("GET", "/staff/tonight", { token: staff.token, at: AFTER });
     expect(tonight.body.batch.status).toBe("open");
@@ -261,8 +266,10 @@ describe("a full night over the API", () => {
     }
 
     await call("POST", `/staff/sessions/${sessionId}/complete`, { token: staff.token, at: DURING(9) });
-    // The ended night stays on the ops screen until everyone is notified.
-    expect((await call("GET", "/staff/tonight", { token: staff.token, at: DURING(9) })).body.batch).toMatchObject({ id: batchId, status: "completed" });
+    // The ended night leaves Tonight but stays listed as unfinished until everyone is notified.
+    const after = (await call("GET", "/staff/tonight", { token: staff.token, at: DURING(9) })).body;
+    expect(after.batch).toBeNull();
+    expect(after.unfinished.map((b: any) => [b.id, b.status])).toEqual([[batchId, "completed"]]);
     expect((await call("POST", `/staff/batches/${batchId}/approve`, { token: staff.token, at: DURING(9) })).body.error).toBe("videos_not_ready");
 
     // The ended session shows as ended, and an unfinished night never blocks the next one.
@@ -295,7 +302,7 @@ describe("a full night over the API", () => {
     expect((await call("GET", `/me/packs/${logList[0].id}/video`, { token: alice.token })).status).toBe(404);
 
     expect((await call("POST", `/staff/batches/${batchId}/approve`, { token: staff.token, at: DURING(11) })).body.notified).toBe(2);
-    expect((await call("GET", "/staff/tonight", { token: staff.token, at: DURING(11) })).body.batch).toBeNull();
+    expect((await call("GET", "/staff/tonight", { token: staff.token, at: DURING(11) })).body.unfinished).toEqual([]);
     expect(emails.map((e) => [e.kind, e.to])).toEqual([
       ["order_confirmation", "alice@x.test"], ["order_confirmation", "bob@x.test"],
       ["order_confirmation", "bob@x.test"],               // bob's order for the next night
