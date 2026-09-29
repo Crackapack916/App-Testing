@@ -150,6 +150,8 @@ function PackEditor({ packId, onApproved, onChange }: { packId: string; onApprov
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!approved) approve(); }
                 else if (e.key === "Enter") { e.preventDefault(); add(); }
+                // Leave the box so the screen keys (T, S, L, N, D, K, P) work again.
+                else if (e.key === "Escape") e.currentTarget.blur();
               }} />
           </label>
           <div className="finishes" role="radiogroup" aria-label="Finish">
@@ -182,7 +184,7 @@ function PackEditor({ packId, onApproved, onChange }: { packId: string; onApprov
                 <div data-testid="preview-price">{found.prices?.[finish] != null ? credits(found.prices[finish]) : "no price"} ({finish})</div>
               </div>
             </>
-          ) : lookupError ? <span className="muted">{lookupError}</span> : <span className="muted">Type a collector number. Letters and symbols are fine (12a, 1638★, IFIYW-2).</span>}
+          ) : lookupError ? <span className="muted">{lookupError}</span> : <span className="muted">Type a collector number. Letters and symbols are fine (12a, 1638★, IFIYW-2). Esc leaves the box so screen keys work.</span>}
         </div>
       )}
 

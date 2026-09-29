@@ -24,7 +24,8 @@ type OpeningData = {
  */
 export function Session({ batch, reload }: { batch: TonightData["batch"]; reload: () => void }) {
   const ready = batch && ["locked", "in_session", "completed"].includes(batch.status);
-  const s = useData<OpeningData>(ready ? `/staff/batches/${batch!.id}/opening` : null);
+  // Refreshes every few seconds so a second screen stays on the right next pack.
+  const s = useData<OpeningData>(ready ? `/staff/batches/${batch!.id}/opening` : null, 4000);
   const { busy, error, run } = useAction();
   const [voiding, setVoiding] = useState(false);
   const [reason, setReason] = useState("");

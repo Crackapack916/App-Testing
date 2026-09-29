@@ -54,6 +54,11 @@ test("a full night: lock, film in strict order, log cards, upload videos, approv
   const collector = page.getByTestId("collector");
   await collector.fill("999");
   await expect(page.getByText("No FDN #999.")).toBeVisible();
+  // Esc leaves the box, so a screen key switches screens instead of typing into it.
+  await collector.press("Escape");
+  await page.keyboard.press("t");
+  await expect(page.getByRole("heading", { name: "Sealed stock" })).toBeVisible();
+  await page.keyboard.press("l");
   for (let pack = 0; pack < 3; pack++) {
     for (const [num, foil] of [["101", false], ["7", false], ["55", true]] as const) {
       await collector.fill(num);

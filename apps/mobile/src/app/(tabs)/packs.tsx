@@ -136,7 +136,7 @@ export default function Packs() {
               <Text style={s.linkText}>How it works and our fairness promise</Text>
             </Pressable>
             <Text style={s.fine}>
-              Your pack stays sealed until tonight's session. We open every pack on camera in queue order between 7 and 8 PM PT.
+              Your pack stays sealed until the queue locks at 7:00 PM PT. Then we open every pack in queue order and film each one.
               You can cancel for a full credit refund until 7 PM PT.
             </Text>
             <ErrorText>{store.error}</ErrorText>
@@ -214,7 +214,7 @@ function ConfirmSheet({ product, qty, total, suggestLimit, onClose, onPlaced, bo
           <View style={{ gap: 12 }}>
             <Text style={type.h2}>You're in tonight's queue</Text>
             <Text style={type.body} testID="placed">
-              {qty} {product.name}{qty > 1 ? "s" : ""}, still sealed. The queue locks at 7:00 PM PT and we open packs on camera between 7 and 8.
+              {qty} {product.name}{qty > 1 ? "s" : ""}, still sealed. The queue locks at 7:00 PM PT, then we open packs in queue order and film each one.
               We'll email you when your cards and video are in your Vault.
             </Text>
             <Button label="Done" onPress={onClose} />

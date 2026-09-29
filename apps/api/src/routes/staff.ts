@@ -213,7 +213,10 @@ staff.post("/batches/:id/opening/next", async (c) => {
   const { rows: [left] } = await db.query("select count(*)::int as n from queue_entries where batch_id = $1 and status = 'queued'", [batchId]);
   if (left.n === 0) {
     await closeFinishedClips(c, sessionId, null);
-    await db.query("select complete_session($1, null, $2)", [sessionId, c.get("user").id]);
+    // Two screens can crack the last two packs at once; the second finds the night already finished.
+    await db.query("select complete_session($1, null, $2)", [sessionId, c.get("user").id]).catch((e) => {
+      if (!String((e as Error).message).includes("session_ended")) throw e;
+    });
   }
   return c.json({ ...p, finished: left.n === 0 });
 });
@@ -249,7 +252,13 @@ async function closeFinishedClips(c: { get: (k: "db" | "user" | "services") => a
   for (const r of rows) {
     const start = Math.max(0, Number(r.first_ms) - CLIP_LEAD_MS);
     const end = Math.max(Number(r.end_ms), start + 1);
-    await db.query("select record_order_clip($1, $2, $3, $4)", [r.order_id, start, end, actor]);
+    try {
+      await db.query("select record_order_clip($1, $2, $3, $4)", [r.order_id, start, end, actor]);
+    } catch (e) {
+      // Another screen cracking at the same moment recorded this clip first.
+      if ((e as { code?: string }).code === "23505") continue;
+      throw e;
+    }
     try {
       const out = await clips.create({ orderId: r.order_id, streamRef: r.stream_ref, sessionStartedAt: new Date(r.started_at), startMs: start, endMs: end });
       if (out.status === "ready") await db.query("select mark_clip_ready($1, $2, $3)", [r.order_id, out.ref, actor]);

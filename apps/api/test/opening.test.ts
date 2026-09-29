@@ -51,4 +51,28 @@ describe("opening packs by night", () => {
     const t = (await call("GET", "/staff/tonight", staff.token, at(6))).body;
     expect([t.batch, t.unfinished.map((x: any) => x.id)]).toEqual([null, [batch.id]]);
   });
+
+  it("gives two screens pressing Crack pack at the same moment one pack each, in queue order, with no errors", async () => {
+    const p = await makeProduct(db);
+    const staff = await login("ops@x.test", "staff");
+    for (const e of ["a", "b", "c"]) {
+      const u = await login(`${e}@x.test`);
+      await db.q("select purchase_credits($1, 5000, $2)", [u.user_id, `r${e}`]);
+      await call("POST", "/orders", u.token, "2026-10-01T12:00:00-07:00", { product_id: p, quantity: 2 });
+    }
+    const { batch } = (await call("GET", "/staff/tonight", staff.token, "2026-10-01T19:01:00-07:00")).body;
+    await call("POST", `/staff/batches/${batch.id}/lock`, staff.token, "2026-10-01T19:01:00-07:00");
+    const at = "2026-10-01T19:10:00-07:00";
+    const o = (await call("GET", `/staff/batches/${batch.id}/opening`, staff.token, at)).body;
+    await call("POST", `/staff/batches/${batch.id}/opening/boxes/${o.next.sealed_boxes[0].id}/open`, staff.token, at);
+    const results = [];
+    for (let round = 0; round < 3; round++) {
+      results.push(...await Promise.all([1, 2].map(() => call("POST", `/staff/batches/${batch.id}/opening/next`, staff.token, at))));
+    }
+    expect(results.map((r) => [r.status, r.body.error])).toEqual(Array(6).fill([200, undefined]));
+    const opened = await db.q("select q.position from pack_openings po join queue_entries q on q.id = po.queue_entry_id where po.batch_id = $1 order by 1", [batch.id]);
+    expect(opened.map((r) => r.position)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(results.filter((r) => r.body.finished)).not.toHaveLength(0);
+    expect((await db.one("select status from batches where id = $1", [batch.id])).status).toBe("completed");
+  });
 });

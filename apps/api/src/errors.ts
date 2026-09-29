@@ -14,6 +14,7 @@ const CODES: Record<string, [number, string]> = {
   not_on_break: [409, "You're not on a break."],
   reason_required: [400, "Give a reason."],
   invalid_login: [401, "That email and password don't match."],
+  too_many_attempts: [429, "Too many wrong passwords. Wait 15 minutes, or reset your password."],
   weak_password: [400, "Use at least 8 characters for your password."],
   invalid_birthdate: [400, "Enter a real date of birth."],
   terms_required: [400, "Agree to the terms to create an account."],
@@ -27,7 +28,7 @@ const CODES: Record<string, [number, string]> = {
   // ordering
   age_not_verified: [403, "Verify your age before ordering."],
   state_blocked: [403, "Orders aren't available in your state yet."],
-  invalid_quantity: [400, "Choose between 1 and 12 packs."],
+  invalid_quantity: [400, "Choose between 1 and 6 packs."],
   product_unavailable: [409, "That set isn't available right now."],
   sold_out: [409, "That set is out of sealed stock for tonight."],
   insufficient_credits: [402, "Not enough credits."],

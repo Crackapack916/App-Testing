@@ -81,4 +81,15 @@ describe("log in and password reset", () => {
     expect((await call("POST", "/auth/reset", { token, password: "again again" }, { at: "2026-10-01T12:31:00Z" })).body.error).toBe("reset_link_invalid");
     expect((await call("POST", "/auth/login", { email: "r@x.test", password: "new password" })).status).toBe(200);
   });
+
+  it("locks sign in after 10 wrong passwords and sends at most 3 reset emails an hour", async () => {
+    await signup("l@x.test", ["01", "01", "1990"]);
+    const at = "2026-10-01T12:00:00-07:00";
+    for (let i = 0; i < 10; i++) await call("POST", "/auth/login", { email: "l@x.test", password: "wrong wrong" }, { at });
+    const locked = await call("POST", "/auth/login", { email: "l@x.test", password: "correct horse" }, { at });
+    expect([locked.status, locked.body.error]).toEqual([429, "too_many_attempts"]);
+    expect((await call("POST", "/auth/login", { email: "l@x.test", password: "correct horse" }, { at: "2026-10-01T12:16:00-07:00" })).status).toBe(200);
+    for (let i = 0; i < 5; i++) expect((await call("POST", "/auth/forgot", { email: "l@x.test" }, { at })).body).toEqual({ ok: true });
+    expect(sent.filter((m) => m.kind === "password_reset")).toHaveLength(3);
+  });
 });

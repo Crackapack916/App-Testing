@@ -26,9 +26,14 @@ auth.post("/signup", async (c) => {
 
 auth.post("/login", async (c) => {
   const { email, password } = await c.req.json<{ email: string; password: string }>();
-  const { rows: [u] } = await c.get("db").query("select id, password_hash from users where email = lower(trim($1))", [email ?? ""]);
+  const db = c.get("db");
+  await db.query("select assert_login_allowed($1)", [email ?? ""]);
+  const { rows: [u] } = await db.query("select id, password_hash from users where email = lower(trim($1))", [email ?? ""]);
   // Same answer for an unknown email and a wrong password.
-  if (!u || !(await verifyPassword(String(password ?? ""), u.password_hash))) throw new ApiError("invalid_login");
+  if (!u || !(await verifyPassword(String(password ?? ""), u.password_hash))) {
+    await db.query("select record_login_failure($1)", [email ?? ""]);
+    throw new ApiError("invalid_login");
+  }
   return c.json({ token: await issueToken(u.id, c.get("services").jwtSecret), user_id: u.id });
 });
 

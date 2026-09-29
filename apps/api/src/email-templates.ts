@@ -31,7 +31,7 @@ const templates: Record<EmailKind, (d: D, c: RenderContext) => Body> = {
     heading: "Your order is in tonight's queue",
     blocks: [
       { p: `${plural(d.packs, "sealed pack")} of ${d.set_name} for ${credits(d.credits)} credits.` },
-      { p: `The queue locks at 7:00 PM PT. We open every pack on camera in queue order between 7 and 8 PM PT, and email you when your cards and video are in your Vault.` },
+      { p: `The queue locks at 7:00 PM PT. Then we open every pack in queue order, film each one, and email you when your cards and video are in your Vault.` },
       { p: `You can cancel for a full credit refund until 7:00 PM PT from Account.` },
       { button: "See your order", href: `${c.appUrl}/account` },
     ],
