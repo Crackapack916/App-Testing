@@ -32,7 +32,7 @@ Customer app tokens live only in `apps/mobile/src/lib/theme.ts`; the staff site 
 * Nothing floats over buttons: rows size to their content instead of fixed heights.
 * Pack tiles are the real product photo with a magenta and violet ring behind it. Never a text only tile.
 * Card art is always the real card image from our database; prices come from our database.
-* Every card sits in a metal frame colored by rarity (`rarityFrame`: common slate, uncommon silver, rare gold, mythic orange), same shape and glow for all. Foils add the shimmer on top.
+* Every card has a full frame colored by rarity (common slate, uncommon silver, rare gold, mythic orange). Non foil: flat matte (`rarityMatte`). Foil: polished metal (`rarityFrame`) with the shimmer and a soft glow.
 
 ## Guardrails (brief rule 5)
 * No value headlines: no best pull, no vault total, no "hit" callouts. Prices appear per card, small; gold is for credits.

@@ -78,12 +78,20 @@ export const rarityColor: Record<string, string> = {
 };
 
 /**
- * Card frames by rarity, like the set symbol's own colors: a polished metal for every card.
- * Every rarity gets the same frame shape and the same soft glow; only the color changes.
- * Foil cards also get the shimmer (FoilShimmer) on top.
+ * Card frames by rarity, like the set symbol's own colors. Every card gets a full frame of the
+ * same shape. Non foil: a flat matte color. Foil: a polished metal of the same color with the
+ * shimmer (FoilShimmer) on top. Only the color changes with rarity.
  */
+export const rarityMatte: Record<string, string> = {
+  common: "#5E5A6B",
+  uncommon: "#A9B6C6",
+  rare: "#C9A227",
+  mythic: "#E2622B",
+  special: "#8F75FF",
+  bonus: "#8F75FF",
+};
 export const rarityFrame: Record<string, [string, string, string]> = {
-  common: ["#9C98A6", "#4A4655", "#8A8699"],
+  common: ["#B4B0BF", "#4A4655", "#9C98A6"],
   uncommon: ["#F2F5FA", "#8FA3B8", "#DCE3EC"],
   rare: ["#FBE39A", "#B8871F", "#F5C95A"],
   mythic: ["#FFC27A", "#D9441F", "#FF8A3D"],

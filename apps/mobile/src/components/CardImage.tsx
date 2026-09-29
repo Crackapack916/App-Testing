@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { LinearGradient, type LinearGradientProps } from "expo-linear-gradient";
 import { Text } from "./Text";
 import { FoilShimmer } from "./FoilShimmer";
-import { colors, font, palette, rarityColor, rarityFrame } from "../lib/theme";
+import { colors, font, palette, rarityColor, rarityFrame, rarityMatte } from "../lib/theme";
 
 // pnpm hoists the staff site's React 18 types for this package; the component is the same.
 const Gradient = LinearGradient as unknown as ComponentType<LinearGradientProps & { children?: ReactNode }>;
@@ -15,10 +15,9 @@ export type CardLike = { name: string; set_code: string; collector_number: strin
 export const CARD_RATIO = 3.5 / 2.5;
 
 /**
- * A card in a polished metal frame colored by rarity (common slate, uncommon silver, rare
- * gold, mythic orange), the same shape and glow for every card. Foil shimmer lives only in the
- * frame: the image itself is never covered, cropped, stretched or color shifted, so the
- * copyright and artist line stays as Scryfall serves it.
+ * A card in a full frame colored by rarity (common slate, uncommon silver, rare gold, mythic
+ * orange). Non foil: flat matte. Foil: polished metal with the shimmer. The frame never covers
+ * the image, which is shown exactly as Scryfall serves it.
  */
 export function CardImage({ card, width: outerWidth }: { card: CardLike; width: number }) {
   // The width given is the whole tile, frame included.
@@ -26,12 +25,14 @@ export function CardImage({ card, width: outerWidth }: { card: CardLike; width: 
   const width = outerWidth - frame * 2;
   const height = Math.round(width * CARD_RATIO);
   const foil = !!card.finish && card.finish !== "nonfoil";
-  const metal = rarityFrame[card.rarity] ?? rarityFrame.common;
+  // Matte is one flat color: the same stop three times.
+  const matte = rarityMatte[card.rarity] ?? rarityMatte.common;
+  const metal = foil ? rarityFrame[card.rarity] ?? rarityFrame.common : [matte, matte, matte] as [string, string, string];
   const glow = rarityColor[card.rarity] ?? palette.line;
   return (
     <Gradient colors={metal} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       style={[s.outer, { width: width + frame * 2, height: height + frame * 2, padding: frame, borderRadius: frame + 3 },
-        Platform.OS === "web" && outerWidth >= 60 ? ({ boxShadow: `0 0 ${Math.round(outerWidth * 0.06)}px ${glow}66` } as object) : null]}
+        Platform.OS === "web" && foil && outerWidth >= 60 ? ({ boxShadow: `0 0 ${Math.round(outerWidth * 0.06)}px ${glow}66` } as object) : null]}
       accessibilityLabel={`${card.name}${foil ? `, ${card.finish}` : ""}`}>
       {foil ? <FoilShimmer width={width + frame * 2} /> : null}
       <View style={[s.inner, { borderRadius: 3 }]}>
