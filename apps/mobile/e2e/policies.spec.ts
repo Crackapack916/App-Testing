@@ -13,4 +13,9 @@ test("a guest reads the fairness promise and the Terms from the footer", async (
   await page.getByTestId("read-terms").click();
   await expect(page.getByTestId("policy-terms")).toContainText("TODO for counsel");
   await expect(page.getByTestId("policy-terms")).toContainText("Governing law");
+  // Back goes to Fairness, then to where the guest started.
+  await page.getByTestId("back").filter({ visible: true }).click();
+  await expect(page).toHaveURL(/\/policies$/);
+  await page.getByTestId("back").filter({ visible: true }).click();
+  await expect(page).toHaveURL(/\/search$/);
 });

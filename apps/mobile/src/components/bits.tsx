@@ -3,7 +3,7 @@ import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, View, type
 import { LinearGradient, type LinearGradientProps } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { CircleAlert } from "./icons";
+import { ChevronLeft, CircleAlert } from "./icons";
 import { Text } from "./Text";
 import { brand, colors, font, radii, rarityColor, stage, type } from "../lib/theme";
 import { legalityTags } from "../lib/format";
@@ -42,10 +42,22 @@ export function CreditsBadge() {
   );
 }
 
-/** Page title on the left, the balance on the right, an optional line underneath. */
-export function Title({ children, sub, balance = true }: { children: ReactNode; sub?: ReactNode; onStage?: boolean; balance?: boolean }) {
+/** Back to where the customer came from, or to Packs when they arrived by a link. */
+export function BackButton({ fallback = "/packs" }: { fallback?: string }) {
+  return (
+    <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace(fallback as never))} accessibilityRole="button"
+      accessibilityLabel="Back" style={s.back} testID="back">
+      <ChevronLeft size={20} color={colors.text} />
+      <Text style={s.backText}>Back</Text>
+    </Pressable>
+  );
+}
+
+/** Page title on the left, the balance on the right, an optional line underneath. Pages opened on top of the tabs pass back. */
+export function Title({ children, sub, balance = true, back }: { children: ReactNode; sub?: ReactNode; onStage?: boolean; balance?: boolean; back?: string }) {
   return (
     <View style={s.titleWrap}>
+      {back ? <BackButton fallback={back} /> : null}
       <View style={s.titleRow}>
         <Text style={[type.h1, { flex: 1 }]} accessibilityRole="header">{children}</Text>
         {balance ? <CreditsBadge /> : null}
@@ -182,6 +194,8 @@ const s = StyleSheet.create({
   glowWrap: { alignItems: "center", overflow: "hidden" },
   glow: { position: "absolute", top: "12%", width: 480, height: 480, borderRadius: 240, backgroundColor: stage.glow,
     ...(Platform.OS === "web" ? { filter: "blur(80px)" } as object : null) },
+  back: { flexDirection: "row", alignItems: "center", gap: 2, alignSelf: "flex-start", minHeight: 44, paddingRight: 12, marginLeft: -6 },
+  backText: { fontFamily: font.bodyMedium, fontSize: 14, color: colors.text },
   titleWrap: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, maxWidth: 900, width: "100%", alignSelf: "center" },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   badge: { alignItems: "flex-end", borderLeftWidth: 2, borderLeftColor: brand.magenta, paddingLeft: 10, minHeight: 44, justifyContent: "center" },

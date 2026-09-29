@@ -3,7 +3,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native"
 import { Text, TextInput } from "../components/Text";
 import { Link } from "expo-router";
 import { Check } from "../components/icons";
-import { Button, ErrorText, Footer } from "../components/bits";
+import { BackButton, Button, ErrorText, Footer } from "../components/bits";
 import { DobFields } from "../components/DobFields";
 import { api } from "../lib/api";
 import { useSession, type Dob } from "../lib/session";
@@ -38,6 +38,7 @@ export default function SignIn() {
 
   return (
     <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
+      <BackButton />
       <View style={s.card} testID="auth-card">
         <Text style={s.logo} accessibilityRole="header">CrackAPack</Text>
         <Text style={s.h1}>{mode === "login" ? "Log in" : mode === "signup" ? "Create your account" : "Reset your password"}</Text>

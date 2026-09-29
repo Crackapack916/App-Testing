@@ -13,7 +13,7 @@ export default function PolicyPage() {
     <Screen>
       <ScrollView>
         <View style={{ maxWidth: 720, width: "100%", alignSelf: "center" }}>
-          <Title sub={p.data ? `Last updated ${updated(p.data.published_at)}, version ${p.data.version}` : " "}>{p.data?.title ?? " "}</Title>
+          <Title back="/policies" balance={false} sub={p.data ? `Last updated ${updated(p.data.published_at)}, version ${p.data.version}` : " "}>{p.data?.title ?? " "}</Title>
           <View style={{ paddingHorizontal: 16 }} testID={`policy-${doc}`}>{p.data ? <Markdown md={p.data.body_md} /> : null}</View>
           <ErrorText>{p.error}</ErrorText>
         </View>

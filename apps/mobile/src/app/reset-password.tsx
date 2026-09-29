@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text, TextInput } from "../components/Text";
 import { router, useLocalSearchParams } from "expo-router";
-import { Button, ErrorText, Screen } from "../components/bits";
+import { BackButton, Button, ErrorText, Screen } from "../components/bits";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
 import { colors, radius, font } from "../lib/theme";
@@ -25,6 +25,7 @@ export default function ResetPassword() {
   return (
     <Screen>
       <View style={s.wrap}>
+        <BackButton />
         <Text style={s.h1}>Choose a new password</Text>
         <TextInput testID="new-password" value={password} onChangeText={setPassword} secureTextEntry autoComplete={"new-password" as never}
           accessibilityLabel="New password" style={s.input} />

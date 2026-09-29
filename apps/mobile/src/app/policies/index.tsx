@@ -17,7 +17,7 @@ export default function Policies() {
     <Screen>
       <ScrollView>
         <View style={s.wrap}>
-          <Title sub={fair.data ? `Last updated ${updated(fair.data.published_at)}` : " "}>Fairness and policies</Title>
+          <Title back="/packs" balance={false} sub={fair.data ? `Last updated ${updated(fair.data.published_at)}` : " "}>Fairness and policies</Title>
           <View style={s.body} testID="policy-fairness">{fair.data ? <Markdown md={fair.data.body_md} /> : null}</View>
           <View style={s.links}>
             {list.data?.policies.filter((p) => p.doc !== "fairness").map((p) => (

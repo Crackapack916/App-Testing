@@ -1,7 +1,7 @@
 import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../components/Text";
 import { router, useLocalSearchParams } from "expo-router";
-import { Button, LegalityTags, Screen, Footer } from "../../components/bits";
+import { BackButton, Button, LegalityTags, Screen, Footer } from "../../components/bits";
 import { CardImage } from "../../components/CardImage";
 import { ResultTile, type SearchCard } from "../(tabs)/search";
 import { useApi } from "../../lib/useApi";
@@ -24,6 +24,7 @@ export default function CardDetail() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, maxWidth: 900, width: "100%", alignSelf: "center" }}>
+        <BackButton fallback="/search" />
         {c && <>
           <View style={{ alignItems: "center" }}><CardImage card={c} width={Math.min(width - 64, 320)} /></View>
           <View style={{ gap: 6 }}>

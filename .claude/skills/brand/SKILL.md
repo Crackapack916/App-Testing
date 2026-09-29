@@ -28,6 +28,8 @@ Customer app tokens live only in `apps/mobile/src/lib/theme.ts`; the staff site 
 * Section labels: small bold spaced capitals in gold.
 * Panels: 16px radius, 1px border. Live or selected items get a 2px magenta border.
 * Bottom tab bar: Drops, Search, Packs (raised circle, violet with a magenta ring when on), Vault, Account. Active icon magenta, label foil.
+* Every page opened on top of the tabs (policies, card detail, sign in, reset) has a Back button top left (`Title back=` or `BackButton`); full screen views (reel, Watch) have a Close button.
+* Nothing floats over buttons: rows size to their content instead of fixed heights.
 * Pack tiles are the real product photo with a magenta and violet ring behind it. Never a text only tile.
 * Card art is always the real card image from our database; prices come from our database.
 

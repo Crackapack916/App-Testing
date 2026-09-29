@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { Check, LayoutGrid, List, Play, Sparkles } from "../../components/icons";
@@ -7,7 +7,6 @@ import { Text, TextInput } from "../../components/Text";
 import { SignInPrompt } from "../../components/SignInPrompt";
 import { Button, Chip, EmptyState, ErrorText, Footer, Panel, RarityPill, Screen, Title } from "../../components/bits";
 import { CardImage } from "../../components/CardImage";
-import { Carousel } from "../../components/Carousel";
 import { api } from "../../lib/api";
 import { useApi } from "../../lib/useApi";
 import { useSession } from "../../lib/session";
@@ -98,13 +97,13 @@ function VaultScreen() {
   const contentWidth = Math.min(width, 1100) - 32;
   const tile = Math.floor((contentWidth - (cols - 1) * 12) / cols);
   const packs = cracked.data?.packs ?? [];
-  const scroll = useRef<ScrollView>(null);
-  const [listY, setListY] = useState(0);
+  // A single pack fills the row; with more, the next one peeks in from the right.
+  const tileW = packs.length > 1 ? Math.min(340, width - 88) : Math.min(1068, width - 56);
   const openReel = (p: Cracked, mode: "video" | "reveal") => router.push({ pathname: "/reel", params: { start: p.pack_id, mode } });
 
   return (
     <Screen>
-      <ScrollView ref={scroll} contentContainerStyle={{ paddingBottom: chosen.length ? 110 : 24 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: chosen.length ? 110 : 24 }}>
         <View style={s.wrap}>
           <Title>Vault</Title>
 
@@ -114,11 +113,11 @@ function VaultScreen() {
                 <Text style={type.label}>{packs[0].batch_date === new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) ? "Cracked today" : `Cracked ${packs[0].batch_date}`}</Text>
                 {packs.some((p) => p.is_new) && <View style={s.newBanner} testID="new-banner"><Text style={s.newText}>New</Text></View>}
               </View>
-              <Carousel label="Cracked today" items={packs} keyOf={(p) => p.pack_id} labelOf={(p) => `${p.set_name}, pack ${p.pack_index} of ${p.order_packs}`}
-                itemWidth={Math.min(340, width - 160)} height={140} render={(p) => <PackTile p={p} onOpen={(mode) => openReel(p, mode)} />} />
-              <Text style={s.skip} accessibilityRole="link" testID="skip-to-cards" onPress={() => scroll.current?.scrollTo({ y: listY, animated: true })}>
-                Skip to my cards
-              </Text>
+              {/* One card per pack, sized to its content; swipe sideways when there are more. */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={tileW + 10} decelerationRate="fast"
+                contentContainerStyle={{ gap: 10 }} accessibilityLabel="Cracked today">
+                {packs.map((p) => <View key={p.pack_id} style={{ width: tileW }}><PackTile p={p} onOpen={(mode) => openReel(p, mode)} /></View>)}
+              </ScrollView>
             </View>
           )}
 
@@ -126,7 +125,7 @@ function VaultScreen() {
             <Text style={type.small} testID="vault-count">{all.reduce((n, c) => n + c.qty, 0)} cards. Market prices from Scryfall, updated daily.</Text>
           </View>
 
-          <View style={s.tools} onLayout={(e) => setListY(e.nativeEvent.layout.y)}>
+          <View style={s.tools}>
             <TextInput value={q} onChangeText={setQ} placeholder="Search your vault" placeholderTextColor={colors.fieldHint} style={s.field}
               accessibilityLabel="Search your vault" testID="vault-search" />
             <View style={s.toolRow}>
@@ -232,7 +231,7 @@ function PackTile({ p, onOpen }: { p: Cracked; onOpen: (mode: "video" | "reveal"
           <Text style={type.h2} numberOfLines={1}>{p.set_name}</Text>
           <Text style={type.small}>Pack {p.pack_index} of {p.order_packs}, {p.cards} cards</Text>
         </View>
-        {p.is_new && <View style={s.newBanner}><Text style={s.newText}>New</Text></View>}
+        {p.is_new && <View style={s.newDot} accessibilityLabel="New" />}
       </View>
       <View style={s.thumbs}>
         {p.thumbs.slice(0, 7).map((t, i) => <Image key={i} source={t} style={s.thumb} contentFit="cover" accessibilityIgnoresInvertColors />)}
@@ -392,7 +391,7 @@ const s = StyleSheet.create({
   thumb: { width: 32, height: 44, borderRadius: 4, backgroundColor: colors.panelHi, borderWidth: 1, borderColor: colors.line },
   newBanner: { backgroundColor: brand.magenta, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 2 },
   newText: { fontFamily: font.bodyBold, fontSize: 11, color: colors.accentInk, letterSpacing: 1.2, textTransform: "uppercase" },
-  skip: { fontFamily: font.bodyMedium, fontSize: 13, color: colors.muted, textDecorationLine: "underline", alignSelf: "center", paddingVertical: 8 },
+  newDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: brand.magenta },
   header: { paddingHorizontal: 16, marginBottom: 8 },
   tools: { paddingHorizontal: 16, gap: 8, marginBottom: 12 },
   toolRow: { flexDirection: "row", gap: 6, alignItems: "center", flexWrap: "wrap" },
