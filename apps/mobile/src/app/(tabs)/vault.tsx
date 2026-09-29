@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { getShipCart, setShipCart } from "../../lib/shipCart";
 import { Check, LayoutGrid, List, Play, Sparkles } from "../../components/icons";
 import { Image } from "expo-image";
 import { Text, TextInput } from "../../components/Text";
@@ -93,6 +94,19 @@ function VaultScreen() {
     setSelected((s) => { const k = keyOf(h); const n = { ...s }; if (n[k]) delete n[k]; else n[k] = h.qty; return n; });
   };
   const done = () => { setSelected({}); setSelecting(false); setAction(null); vault.reload(); };
+  // Back from the shipping checkout: a finished shipment clears the picks and refreshes the Vault.
+  useFocusEffect(useCallback(() => {
+    if (getShipCart()?.shipped) { setShipCart(null); setSelected({}); setSelecting(false); vault.reload(); }
+  }, [])); // eslint-disable-line react-hooks/exhaustive-deps
+  const toShipping = () => {
+    if (!vault.data) return;
+    setShipCart({ shipped: false, shipping: vault.data.shipping, items: chosen.map(({ h, qty }) => ({
+      key: keyOf(h), card_id: h.card_id, individual_card_id: h.individual_card_id, finish: h.finish, condition: h.condition, qty,
+      name: h.name, set_code: h.set_code, set_name: h.set_name, collector_number: h.collector_number, rarity: h.rarity,
+      image_url: h.image_small ?? h.image_url, market_cents: h.market_cents })) });
+    router.push("/ship");
+  };
+  const count = chosen.reduce((n, c) => n + c.qty, 0);
   const cols = width >= 1100 ? 5 : width >= 760 ? 4 : width >= 520 ? 3 : 2;
   const contentWidth = Math.min(width, 1100) - 32;
   const tile = Math.floor((contentWidth - (cols - 1) * 12) / cols);
@@ -103,7 +117,7 @@ function VaultScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ paddingBottom: chosen.length ? 110 : 24 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: all.length ? 110 : 24 }}>
         <View style={s.wrap}>
           <Title>Vault</Title>
 
@@ -131,7 +145,6 @@ function VaultScreen() {
             <View style={s.toolRow}>
               <Chip on={showFilters} onPress={() => setShowFilters(!showFilters)} label="Filters" testID="vault-filters" />
               <Chip on={groupBySet} onPress={() => setGroupBySet(!groupBySet)} label="Group by set" testID="group-by-set" />
-              <Chip on={selecting} onPress={() => { setSelecting(!selecting); setSelected({}); }} label={selecting ? "Done selecting" : "Select"} testID="select-mode" />
               <View style={{ flexDirection: "row", marginLeft: "auto" }}>
                 <IconToggle on={view === "grid"} label="Grid" onPress={() => setView("grid")}><LayoutGrid size={18} color={colors.text} /></IconToggle>
                 <IconToggle on={view === "list"} label="List" onPress={() => setView("list")}><List size={18} color={colors.text} /></IconToggle>
@@ -205,17 +218,27 @@ function VaultScreen() {
         <Footer />
       </ScrollView>
 
-      {chosen.length > 0 && (
-        <View style={s.bar}>
-          <Text style={s.name}>{chosen.reduce((n, c) => n + c.qty, 0)} selected</Text>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Button testID="ship" label="Ship" onPress={() => setAction("ship")} />
-            {canSell && <Button testID="sell" kind="ghost" label="Sell back" onPress={() => setAction("sell")} />}
+      {/* Shipping starts here: pick cards, then the checkout. */}
+      {all.length > 0 && !selecting && (
+        <View style={[s.bar, s.barPlain]}>
+          <Button testID="select-mode" label="Select cards to ship" onPress={() => { setSelecting(true); setSelected({}); }} style={{ flex: 1 }} />
+        </View>
+      )}
+      {selecting && (
+        <View style={s.bar} testID="ship-bar">
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={s.name} testID="selected-count">{count ? `${count} selected` : "Tap cards to pick them"}</Text>
+            <Text style={s.barLink} accessibilityRole="button" testID="select-all"
+              onPress={() => setSelected(count === all.reduce((n, h) => n + h.qty, 0) ? {} : Object.fromEntries(all.map((h) => [keyOf(h), h.qty])))}>
+              {count && count === all.reduce((n, h) => n + h.qty, 0) ? "Clear all" : "Select all"}
+            </Text>
           </View>
+          <Button kind="ghost" label="Cancel" testID="cancel-select" onPress={() => { setSelecting(false); setSelected({}); }} style={{ paddingHorizontal: 14 }} />
+          {canSell && count > 0 && <Button testID="sell" kind="ghost" label="Sell back" onPress={() => setAction("sell")} style={{ paddingHorizontal: 14 }} />}
+          <Button testID="ship" label="Ship" onPress={toShipping} disabled={!count} style={{ paddingHorizontal: 18 }} />
         </View>
       )}
       {action === "sell" && <SellSheet items={chosen} onClose={() => setAction(null)} onDone={done} />}
-      {action === "ship" && vault.data && <ShipSheet items={chosen} shipping={vault.data.shipping} onClose={() => setAction(null)} onDone={done} />}
       {detail && <DetailSheet c={detail} canSell={canSell} onClose={() => setDetail(null)} />}
     </Screen>
   );
@@ -327,52 +350,6 @@ function SellSheet({ items, onClose, onDone }: { items: { h: Holding; qty: numbe
   );
 }
 
-function ShipSheet({ items, shipping, onClose, onDone }: { items: { h: Holding; qty: number }[]; shipping: { free_min: number; fee: number };
-  onClose: () => void; onDone: () => void }) {
-  const { refresh } = useSession();
-  const [addr, setAddr] = useState({ name: "", line1: "", line2: "", city: "", state: "", zip: "" });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ fee_credits: number } | null>(null);
-  const value = items.reduce((n, { h, qty }) => n + (h.market_cents ?? 0) * qty, 0);
-  const ship = async () => {
-    setBusy(true); setError(null);
-    try { setResult(await api("POST", "/me/shipments", { items: items.map(({ h, qty }) => asItem(h, qty)), address: addr })); await refresh(); }
-    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
-  };
-  const field = (k: keyof typeof addr, label: string, auto: string) => (
-    <TextInput testID={`addr-${k}`} value={addr[k]} onChangeText={(v) => setAddr({ ...addr, [k]: v })} placeholder={label} accessibilityLabel={label}
-      placeholderTextColor={colors.faint} style={s.search} autoComplete={auto as never} />
-  );
-  return (
-    <Sheet onClose={onClose}>
-      {result ? (
-        <View style={{ gap: 12 }}>
-          <Text style={type.h2}>Shipping requested</Text>
-          <Text style={type.body}>{result.fee_credits ? `${credits(result.fee_credits)} credits for shipping.` : "Free shipping."} We'll pack your cards and email tracking.</Text>
-          <Button label="Done" onPress={onDone} />
-        </View>
-      ) : (
-        <View style={{ gap: 10 }}>
-          <Text style={type.h2}>Ship to me</Text>
-          <Text style={type.body}>
-            {value >= shipping.free_min ? `Free shipping on ${dollars(shipping.free_min)} or more.`
-              : `${dollars(shipping.fee)} shipping (${credits(shipping.fee)} credits) under ${dollars(shipping.free_min)}. These cards are ${dollars(value)}.`}
-          </Text>
-          {field("name", "Full name", "name")}{field("line1", "Street address", "address-line1")}{field("line2", "Apartment, suite (optional)", "address-line2")}
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <View style={{ flex: 2 }}>{field("city", "City", "address-level2")}</View>
-            <View style={{ flex: 1 }}>{field("state", "State", "address-level1")}</View>
-            <View style={{ flex: 1.2 }}>{field("zip", "ZIP", "postal-code")}</View>
-          </View>
-          <Button testID="request-shipment" label="Request shipment" onPress={ship} busy={busy} disabled={!addr.name || !addr.line1 || !addr.city || !addr.state || !addr.zip} />
-          <ErrorText>{error}</ErrorText>
-        </View>
-      )}
-    </Sheet>
-  );
-}
-
 function Sheet({ children, onClose }: { children: ReactNode; onClose: () => void }) {
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -412,7 +389,9 @@ const s = StyleSheet.create({
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
   mono: { fontFamily: font.bodyBold, fontSize: 14, color: brand.gold },
   bar: { position: "absolute", left: 12, right: 12, bottom: 12, backgroundColor: colors.panel, borderRadius: radii.panel, borderWidth: 1.5,
-    borderColor: brand.magenta, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center", maxWidth: 700, alignSelf: "center" },
+    borderColor: brand.magenta, padding: 10, flexDirection: "row", gap: 8, alignItems: "center", maxWidth: 700, alignSelf: "center" },
+  barPlain: { backgroundColor: "transparent", borderWidth: 0, padding: 0 },
+  barLink: { fontFamily: font.bodyMedium, fontSize: 12.5, color: colors.link, textDecorationLine: "underline" },
   scrim: { flex: 1, backgroundColor: "rgba(10, 8, 16, 0.7)" },
   sheet: { backgroundColor: colors.panel, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 32, maxHeight: "88%",
     maxWidth: 640, width: "100%", alignSelf: "center", borderWidth: 1, borderColor: colors.line },

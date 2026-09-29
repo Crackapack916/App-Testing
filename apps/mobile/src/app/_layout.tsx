@@ -43,6 +43,7 @@ function Root() {
       <Stack.Protected guard={!!me?.age_verified}>
         <Stack.Screen name="pack/[id]" options={{ presentation: "fullScreenModal" }} />
         <Stack.Screen name="reel" options={{ presentation: "fullScreenModal", animation: "fade" }} />
+        <Stack.Screen name="ship" />
       </Stack.Protected>
       <Stack.Protected guard={!!me && !me.age_verified}>
         <Stack.Screen name="verify-age" />

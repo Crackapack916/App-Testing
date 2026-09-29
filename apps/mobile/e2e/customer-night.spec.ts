@@ -140,17 +140,22 @@ test("a customer's night: order, get cracked, watch, vault, ship, search", async
   // Ship the commons: 5 x $3.50 = $17.50, under $50, so 499 credits shipping.
   await page.getByTestId("select-mode").click();
   await page.getByTestId("holding-FDN-7").click();
+  await expect(page.getByTestId("selected-count")).toHaveText("5 selected");
   await expect(page.getByTestId("sell")).toHaveCount(0);
   await page.getByTestId("ship").click();
+  // Shipping checkout: the cards, the address, the fee in credits.
+  await expect(page.getByTestId("ship-items")).toContainText("Llanowar Elves");
+  await expect(page.getByTestId("ship-fee")).toHaveText("499 credits");
+  await expect(page.getByTestId("request-shipment")).toBeDisabled();
   await page.getByTestId("addr-name").fill("Alice Example");
   await page.getByTestId("addr-line1").fill("1 K St");
   await page.getByTestId("addr-city").fill("Sacramento");
   await page.getByTestId("addr-state").fill("CA");
   await page.getByTestId("addr-zip").fill("95814");
+  await shot(page, "m5-ship-checkout");
   await page.getByTestId("request-shipment").click();
-  await expect(page.getByText("Shipping requested")).toBeVisible();
-  await expect(page.getByText("499 credits for shipping.")).toBeVisible();
-  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page.getByTestId("ship-done")).toContainText("499 credits for shipping.");
+  await page.getByTestId("ship-back").click();
   await expect(page.getByTestId("holding-FDN-7")).toHaveCount(0);
 
   // Search: legality and prices from the catalog.
