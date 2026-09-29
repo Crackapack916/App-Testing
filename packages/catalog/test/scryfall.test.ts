@@ -63,10 +63,16 @@ describe("bulk import and search on our own database", () => {
     expect((await db.q("select status, message from import_runs order by id desc limit 1"))[0]).toMatchObject({ status: "failed" });
   });
 
-  it("re-importing keeps internal ids stable", async () => {
+  it("re-importing keeps internal ids stable and leaves unchanged rows unwritten", async () => {
     const before = await db.one("select id from cards where set_code = 'M10' and collector_number = '146'");
+    // xmin changes whenever a row is rewritten; an unchanged catalog must not be rewritten (storage limit).
+    const versions = `select (select string_agg(xmin::text, ',' order by id) from cards) as cards,
+      (select string_agg(xmin::text, ',' order by card_id) from card_images) as images,
+      (select string_agg(xmin::text, ',' order by card_id, source) from card_external_ids) as ids`;
+    const v1 = await db.one(versions);
     await importScryfallBulk(db.pool, { file: F("cards.json"), setsFile: F("sets.json") });
     expect(await db.one("select id from cards where set_code = 'M10' and collector_number = '146'")).toEqual(before);
+    expect(await db.one(versions)).toEqual(v1);
   });
 
   it("matches names with trigrams, ranks exact then prefix, folds case and accents, and uses the index", async () => {
