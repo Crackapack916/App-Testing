@@ -15,7 +15,7 @@ import { credits, dollars, pacific } from "../../lib/format";
 import { font, palette, radii, stage, type } from "../../lib/theme";
 
 type Tier = { min_qty: number; per_pack_credits: number };
-type Status = "available" | "sold_out" | "limit_reached" | "upcoming" | "ended" | "on_break";
+type Status = "available" | "sold_out" | "limit_reached" | "upcoming" | "ended" | "on_break" | "unavailable";
 export type Product = { product_id: string; set_code: string; set_name: string; booster_type: string; name: string; icon_svg_uri: string | null;
   wizards_info_url: string | null; pack_image_url: string | null; ladder: Tier[]; drop_id: string | null; drop_starts_at: string | null;
   drop_ends_at: string | null; drop_state: string | null; held: number; set_limit: number; left_for_you: number; max_qty: number; status: Status };
@@ -165,6 +165,7 @@ function StateNote({ p, breakUntil }: { p: Product; breakUntil: string | null })
     limit_reached: { title: "Limit reached", body: `You have all ${p.set_limit} of your ${p.set_name} packs for this test run.` },
     upcoming: { title: "Next drop", body: p.drop_starts_at ? `Goes live ${pacific(p.drop_starts_at)} PT.` : "Coming soon.", action: { label: "See drops", to: "/drops" } },
     ended: { title: "This drop has ended", body: "See Drops for what's next.", action: { label: "See drops", to: "/drops" } },
+    unavailable: { title: "Temporarily unavailable", body: `${p.set_name} can't be ordered right now. Check back soon.` },
     on_break: { title: "You're on a break", body: breakUntil ? `You can buy packs again after ${pacific(breakUntil)} PT.` : "", action: { label: "Spending settings", to: "/account" } },
   };
   const n = note[p.status as Exclude<Status, "available">];

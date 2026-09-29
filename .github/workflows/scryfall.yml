@@ -11,6 +11,10 @@ on:
         description: "Only refresh the test fixtures (real printings) and commit them"
         type: boolean
         default: false
+      set:
+        description: "Only import and check one set (its code, e.g. FDN)"
+        type: string
+        default: ""
 jobs:
   # Scheduled runs skip quietly until the NEON_DATABASE_URL secret exists (docs/SETUP.md step 1).
   check:
@@ -43,7 +47,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @crackapack/catalog scryfall
+      - name: Daily bulk import (every printing)
+        if: ${{ !inputs.set }}
+        run: pnpm --filter @crackapack/catalog scryfall
+      # Business context section 15: every set on sale gets its own import and check, whether or
+      # not the bulk import worked. A set that fails its check stops selling until it passes.
+      - name: Per set import and check
+        if: ${{ !cancelled() }}
+        run: pnpm --filter @crackapack/catalog scryfall ${{ inputs.set && format('--set {0}', inputs.set) || '--sets-on-sale' }}
 
   # Real printings for the test suite (this repo's dev container cannot reach Scryfall).
   fixtures:

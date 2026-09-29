@@ -228,3 +228,39 @@ Break-even is roughly 206-232 packs a month, about seven boxes. Note the hours/w
 
 **Internal staff tool, this is not optional:**
 A same-day operations view: the locked order queue for that evening, a way to start and manage the filmed opening session against that queue in strict order, and a clipping and notification trigger once a pack is opened and matched. This tool is used every single day orders exist, design it for a fast, low-friction nightly session, since this labor cost repeats daily regardless of volume.
+
+## 14. Resale and inventory recovery
+
+This section covers what happens after a customer sells a card back. Buyback is an ownership change, not a shipment. The card is already physically in our vault, so it moves from the customer's ledger to house inventory. The business then recovers value by reselling it.
+
+### Channel costs (verify before building, fees change)
+
+| Channel | Cost to sell | Notes |
+|---|---|---|
+| TCGplayer marketplace | 10.75% commission plus 2.5% plus $0.30 per order, about 13% to 14% of a typical order | New sellers are capped at 100 active listings until Level 4 (51 fulfilled orders, 90% feedback). W-9 required. No new official API access is being granted, so use CSV bulk listing in the Seller Portal |
+| eBay | 13.25% final value fee on trading cards, no separate processing fee | Official Sell Inventory API exists. Good for bulk lots and higher value singles |
+| Buylists (Card Kingdom and similar) | Pay a fraction of retail, often 40% to 70% in credit and 25% to 50% in cash | No listing labor. Card Kingdom accepts a CSV. Best for bulk and slow cards |
+| Our own site (phase 2, off by default) | No channel fee | Customers spend credit on singles from house stock. Recycles credit at no fee |
+
+### Cheap cards
+The flat $0.30 and postage eat cheap cards. One estimate has about 40% of a cheap card's value gone once postage is paid. Below roughly $0.25 a card goes to bulk (lots, giveaway filler, buylist bulk). Between $0.25 and $2, sell in multi card orders so the flat fee is shared.
+
+### Credit accounting
+Buyback pays in credit at face value, but the real cost of that credit is what the customer buys with it. If credit is spent on packs, its cost is about pack cost divided by pack price, roughly 40% to 60% depending on box price and ladder tier. Track both credit_issued (face value) and estimated_cost_basis. Judge resale against cost basis, and also report it against face value, because unspent credit changes the picture.
+
+Example: a $5 card bought back at 90% is $4.50 of credit. Resold on TCGplayer it nets about $4.03 before postage. Against face value that is a $0.47 loss. Against a cost basis near $2.50 it is about a $1.50 gain. The model only works if credit really gets recycled into packs.
+
+### Rules
+- Never reseal packs and never build mystery bundles from house inventory. Bulk giveaway filler only: cards under $0.25 each, labeled as bulk, no rares or foils.
+- Physical count invariant: physical cards on the shelf must equal customer vault ledger plus house stock plus in transit. Reconcile it regularly.
+- Sales tax: marketplaces collect and remit on their own sales, but we still need our own seller's permit and collect on sales through our own site.
+
+## 15. Card data must be guaranteed for every offered set, not just hoped for
+
+The daily bulk import (every Magic printing, roughly 90,000+ rows) is the main way card data and images reach the database. That job can fail, run late, or partially complete, see the scryfall workflow failure on 2026-09-28 ("Failed to parse URL from undefined") for a real example.
+
+A failed or incomplete daily import must never be able to produce a blank card in a customer's Vault. Every set currently sold as a pack needs its own guaranteed, checked import path, separate from and more reliable than the big daily job:
+
+- A per-set import (or verification pass) runs whenever a new set is added to the Packs page, and again before any wave for that set goes live.
+- Before a set can go live for purchase, the system confirms every printing in that set exists in the database with a valid image URL. If it doesn't, the set stays unavailable and this is surfaced to staff, not discovered later by a customer with a blank Vault card.
+- This check runs independently of whether the full daily bulk import happened to succeed that day.

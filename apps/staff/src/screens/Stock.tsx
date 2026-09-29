@@ -6,6 +6,7 @@ type Tier = { min_qty: number; per_pack_credits: number };
 type Product = {
   id: string; name: string; set_code: string; set_name: string; booster_type: string; active: boolean;
   packs_on_hand: number; packs_reserved: number; sealed_boxes: number; safety_buffer_packs: number; ladder: Tier[] | null;
+  card_data_ok: boolean; card_data_checked_at: string | null; card_data_problem: string | null; card_data_expected: number;
 };
 type SetRow = { code: string; name: string; release_date: string | null };
 
@@ -74,15 +75,32 @@ function ProductCard({ p, reload }: { p: Product; reload: () => void }) {
     setLabel("");
     reload();
   });
+  // Section 15: a set sells only after every printing is in our database with an image.
+  const checkCards = () => run(async () => { await api("POST", `/staff/sets/${p.set_code}/card-data`); reload(); });
   const saveLadder = () => run(async () => { await api("PUT", `/staff/products/${p.id}/ladder`, { ladder }); setLadder(null); reload(); });
 
   return (
     <section className="panel" data-testid={`product-${p.set_code}`}>
       <div className="row-between">
         <h2>{p.name} <span className="mono muted">{p.set_code}</span></h2>
-        <button className={p.active ? "ghost" : "primary"} disabled={busy} onClick={toggle} data-testid="toggle">
+        <button className={p.active ? "ghost" : "primary"} disabled={busy || (!p.active && !p.card_data_ok)} onClick={toggle} data-testid="toggle"
+          title={!p.active && !p.card_data_ok ? "Import and check the card data first" : undefined}>
           {p.active ? "Take off sale" : "Put on sale"}
         </button>
+      </div>
+      <div className={`banner ${p.card_data_ok ? "" : "warn"}`} data-testid="card-data">
+        <div className="row-between">
+          <span>
+            <b>Card data: {p.card_data_ok ? "checked" : "not checked"}</b>
+            {p.card_data_expected ? `, ${p.card_data_expected} printings` : ""}
+            {p.card_data_problem ? `. ${p.card_data_problem}.` : ""}
+            {p.card_data_checked_at ? <span className="muted"> Last checked {new Date(p.card_data_checked_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })} PT.</span> : null}
+            {!p.card_data_ok && <span> This set can't be sold until the check passes.</span>}
+          </span>
+          <button className={p.card_data_ok ? "ghost" : "primary"} disabled={busy} onClick={checkCards} data-testid="check-cards">
+            {busy ? "Importing" : "Import and check"}
+          </button>
+        </div>
       </div>
       <div className="stats">
         <div className="stat"><div className="label">Status</div><div className="value">{p.active ? (available ? "On sale" : "Sold out") : "Off sale"}</div></div>

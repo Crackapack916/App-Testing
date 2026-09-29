@@ -3,8 +3,13 @@ import { freshDb, type Db } from "../../../packages/db/test/db";
 import { makeCard, makeProduct } from "../../../packages/db/test/fixtures";
 import { createApp } from "../src/app";
 import { linkClips } from "../src/clips";
+import { mapScryfallCard, type ScryfallCard } from "@crackapack/catalog/scryfall";
 import { logEmail, type EmailMessage } from "../src/email";
 import type { VideoStorage } from "../src/videos";
+
+const eoeCard = { object: "card", id: "x", oracle_id: "o", name: "Test Printing", set: "eoe", set_name: "Edge of Eternities", collector_number: "1",
+  rarity: "common", type_line: "Creature", finishes: ["nonfoil"], legalities: {}, layout: "normal", released_at: "2025-08-01", games: ["paper"],
+  image_uris: { small: "https://cards.test/s.jpg", normal: "https://cards.test/n.jpg" }, prices: { usd: "0.10" } } as unknown as ScryfallCard;
 
 let db: Db;
 let app: ReturnType<typeof createApp>;
@@ -32,6 +37,13 @@ beforeEach(async () => {
     devStaffEmails: ["ops@x.test"],
     testClock: true,
     dobKey: Buffer.alloc(32, 1),
+    // Stands in for Scryfall in the per set import (section 15): EOE has two printings, both with images.
+    cardData: {
+      name: "fake",
+      lookup: async () => null,
+      set: async (code) => (code === "eoe" ? { code: "eoe", name: "Edge of Eternities", set_type: "expansion", icon_svg_uri: "https://svgs.test/eoe.svg" } : null),
+      setPrintings: async (code) => ["1", "2"].map((n) => mapScryfallCard({ ...eoeCard, set: code, collector_number: n, id: `eoe-${n}` })!),
+    },
   });
 });
 afterEach(async () => { await db.close(); });
@@ -170,6 +182,12 @@ describe("catalog and products", () => {
     expect(lad.body.error).toBe("ladder_not_decreasing");
     await call("POST", "/staff/boxes", { token: staff.token, body: { product_id, label: "EOE-1", pack_count: 30 } });
     expect((await call("GET", "/storefront", { at: BEFORE })).body.products).toEqual([]);
+    // Section 15: no sale until the set's card data passes its check.
+    const refused = await call("POST", `/staff/products/${product_id}/active`, { token: staff.token, body: { active: true } });
+    expect([refused.status, refused.body.error]).toEqual([409, "card_data_unverified"]);
+    const check = await call("POST", "/staff/sets/eoe/card-data", { token: staff.token });
+    expect(check.body).toMatchObject({ set_code: "EOE", ok: true, expected: 2 });
+    expect((await call("GET", "/staff/products", { token: staff.token })).body.products[0]).toMatchObject({ card_data_ok: true, card_data_expected: 2 });
     await call("POST", `/staff/products/${product_id}/active`, { token: staff.token, body: { active: true } });
     const store = (await call("GET", "/storefront", { at: BEFORE })).body.products;
     expect(store[0]).toMatchObject({ name: "Edge of Eternities Play Booster", status: "available", sold_out: false, left_for_you: 6, max_qty: 6 });

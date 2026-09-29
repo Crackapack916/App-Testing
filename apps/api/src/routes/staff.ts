@@ -5,6 +5,7 @@ import { ApiError } from "../errors";
 import type { ClipService, Env } from "../context";
 import type { localVideos } from "../videos";
 import { sendSafely, staffAlert } from "../notify";
+import { importSetCardData } from "@crackapack/catalog/lookup";
 import { createWriteStream } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -519,6 +520,8 @@ staff.post("/team/role", requireUser("admin"), async (c) => {
 staff.get("/products", async (c) => {
   const { rows } = await c.get("db").query(
     `select p.*, s.name as set_name, s.wizards_info_url, s.pack_image_url, st.packs_on_hand, st.packs_reserved,
+            s.card_data_ok, s.card_data_checked_at, s.card_data_problem,
+            (select count(*) from set_expected_printings e where e.set_code = p.set_code)::int as card_data_expected,
             (select count(*) from sealed_boxes x where x.product_id = p.id and x.status = 'sealed')::int as sealed_boxes,
             (select json_agg(json_build_object('min_qty', t.min_qty, 'per_pack_credits', t.per_pack_credits) order by t.min_qty)
              from price_tiers t where t.product_id = p.id) as ladder
@@ -559,6 +562,21 @@ staff.put("/sets/:code", async (c) => {
   const b = await c.req.json<{ wizards_info_url?: string | null; pack_image_url?: string | null }>();
   await c.get("db").query("select set_set_info($1, $2, $3)", [c.req.param("code"), b.wizards_info_url ?? null, b.pack_image_url ?? null]);
   return c.json({ ok: true });
+});
+
+// Section 15: import one set's printings from the card data provider, then check it. A set sells
+// only after this passes; the daily jobs re-check every set on sale.
+staff.post("/sets/:code/card-data", async (c) => {
+  const provider = c.get("services").cardData;
+  if (!provider) throw new ApiError("card_data_unavailable", 503);
+  try {
+    return c.json(await importSetCardData(c.get("db"), provider, c.req.param("code")));
+  } catch (e) {
+    const code = String((e as Error).message);
+    if (code === "unknown_set" || code === "no_printings") throw new ApiError(code);
+    await c.get("db").query("select verify_set_card_data($1, 'per_set_import') where exists (select 1 from mtg_sets where code = upper($1))", [c.req.param("code")]).catch(() => {});
+    throw new ApiError("card_data_import_failed", 502);
+  }
 });
 
 // Per set limit override for one customer, with a reason (logged, append only).

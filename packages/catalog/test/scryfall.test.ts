@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { freshDb, type Db } from "../../db/test/db";
 import { importScryfallBulk, scryfallProvider } from "../src/provider";
+import { importSetCardData } from "../src/lookup";
 import { HEADERS, limiter, mapScryfallCard, type ScryfallCard } from "../src/scryfall";
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
@@ -111,5 +112,32 @@ describe("the JSON Lines bulk file (Scryfall's current format)", () => {
   it("also takes plain JSON Lines and the older JSON array", async () => {
     expect((await importScryfallBulk(db.pool, { fetchImpl: fakeFetch(Buffer.from(jsonl)) })).rows).toBe(kept);
     expect((await importScryfallBulk(db.pool, { fetchImpl: fakeFetch(Buffer.from(JSON.stringify(real.slice(0, 40)))) })).rows).toBe(kept);
+  });
+});
+
+// Business context section 15: one set, page by page, then its check.
+describe("per set import", () => {
+  let db: Db;
+  beforeAll(async () => { db = await freshDb(); });
+  afterAll(async () => { await db.close(); });
+
+  it("pages through the set, records every printing, and passes the check", async () => {
+    const m10 = real.filter((c) => c.set === "m10");
+    const pages = [m10.slice(0, 1), m10.slice(1)];
+    const urls: string[] = [];
+    const fake = (async (url: string) => {
+      urls.push(url);
+      if (url.endsWith("/sets/m10")) return new Response(JSON.stringify({ code: "m10", name: "Magic 2010", set_type: "core", icon_svg_uri: "https://svgs.test/m10.svg", released_at: "2009-07-17" }));
+      if (url.includes("/cards/search")) {
+        const i = url.includes("page=2") ? 1 : 0;
+        return new Response(JSON.stringify({ data: pages[i], has_more: i === 0, next_page: i === 0 ? "https://api.scryfall.com/cards/search?q=e%3Am10&page=2" : undefined }));
+      }
+      return new Response("{}", { status: 404 });
+    }) as unknown as typeof fetch;
+    const r = await importSetCardData(db.pool, scryfallProvider(fake), "M10");
+    expect(r).toMatchObject({ set_code: "M10", ok: true, expected: m10.length, problem: null });
+    expect(urls.filter((u) => u.includes("/cards/search"))).toHaveLength(2);
+    expect(urls[1]).toContain("unique=prints&include_extras=true&include_variations=true");
+    await expect(importSetCardData(db.pool, scryfallProvider(fake), "zzz")).rejects.toThrow(/unknown_set/);
   });
 });

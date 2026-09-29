@@ -4,7 +4,7 @@
  */
 import pg from "pg";
 import { runJobs } from "../../../packages/db/scripts/jobs";
-import { runEmailJobs } from "../src/jobs";
+import { runCardDataChecks, runEmailJobs } from "../src/jobs";
 import { gmailEmail, logEmail } from "../src/email";
 
 const env = process.env;
@@ -15,7 +15,8 @@ const email = env.GMAIL_APP_PASSWORD
   : logEmail();
 const pool = new pg.Pool({ connectionString: env.DATABASE_URL, max: 1 });
 try {
-  console.log(JSON.stringify({ ...(await runJobs(pool)), ...(await runEmailJobs(pool, email, appUrl)) }));
+  console.log(JSON.stringify({ ...(await runJobs(pool)), ...(await runEmailJobs(pool, email, appUrl)),
+    card_data: await runCardDataChecks(pool, email) }));
 } finally {
   await pool.end();
 }

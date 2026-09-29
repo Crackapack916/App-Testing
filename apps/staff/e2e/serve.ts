@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,6 +42,18 @@ await db.q("insert into users (email, display_name, role, age_verified_at, passw
   [await hashPassword("ops password")]);
 await db.pool.end();
 
+// A stand in for Scryfall's API with the two EOE printings the Stock test checks (section 15).
+const SCRY_PORT = 8798;
+const eoe = (n: string) => ({ object: "card", id: `eoe-${n}`, oracle_id: `o-${n}`, name: `Test Printing ${n}`, set: "eoe", collector_number: n,
+  rarity: "common", type_line: "Creature", finishes: ["nonfoil"], legalities: {}, layout: "normal", released_at: "2025-08-01", games: ["paper"],
+  image_uris: { small: "https://cards.test/s.jpg", normal: "https://cards.test/n.jpg" }, prices: { usd: "0.10" } });
+createServer((req, res) => {
+  res.setHeader("content-type", "application/json");
+  if (req.url?.startsWith("/sets/eoe")) return res.end(JSON.stringify({ code: "eoe", name: "Edge of Eternities", released_at: "2025-08-01", set_type: "expansion", icon_svg_uri: "" }));
+  if (req.url?.startsWith("/cards/search") && req.url.includes("e%3Aeoe")) return res.end(JSON.stringify({ data: [eoe("1"), eoe("2")], has_more: false }));
+  res.statusCode = 404; res.end("{}");
+}).listen(SCRY_PORT);
+
 const child = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {
   stdio: "inherit",
   env: {
@@ -52,6 +65,7 @@ const child = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {
     DEV_STAFF_EMAILS: "ops@e2e.test",
     STAFF_DIST: resolve("dist"),
     VIDEO_DIR: mkdtempSync(join(tmpdir(), "e2e-videos-")),
+    SCRYFALL_API_BASE: `http://localhost:${SCRY_PORT}`,
     PORT: process.env.E2E_PORT ?? "8788",
   },
 });

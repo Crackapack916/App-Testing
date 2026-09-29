@@ -14,6 +14,8 @@ Status key: **you** = needs your account or approval, **Claude** = can be done f
 | Variable `MAILING_ADDRESS` (step 3) | Same place, Variables tab |
 | Run **scryfall** once (it then runs daily) | Repo, Actions, scryfall, Run workflow |
 
+Before a set can go on sale, its card data must pass a check (every printing present with an image). Press **Import and check** on the staff Stock screen, or run **scryfall** with the set code. The daily run re-imports and checks every set on sale.
+
 The **jobs** workflow runs every 15 minutes: locks queues at 7:00 PM PT, releases held sell backs, and sends drop reminders and break ended emails. It skips quietly until `NEON_DATABASE_URL` exists.
 
 ## 2. Stripe: credits (you)

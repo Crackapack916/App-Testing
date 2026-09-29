@@ -5,7 +5,7 @@
  */
 import type pg from "pg";
 import type { EmailProvider } from "./email";
-import { sendSafely } from "./notify";
+import { sendSafely, staffAlert } from "./notify";
 
 export async function runEmailJobs(pool: pg.Pool, email: EmailProvider, appUrl: string) {
   let reminders = 0;
@@ -24,4 +24,22 @@ export async function runEmailJobs(pool: pg.Pool, email: EmailProvider, appUrl: 
     breaks++;
   }
   return { reminders, breaks };
+}
+
+/**
+ * Section 15: re-check every set on sale or with a drop coming. A set that stops passing stops
+ * selling (the database refuses its orders) and the business inbox hears about it.
+ */
+export async function runCardDataChecks(pool: pg.Pool, email: EmailProvider) {
+  const results: { set_code: string; ok: boolean }[] = [];
+  const { rows } = await pool.query("select s.code, m.card_data_ok as was_ok from sets_needing_card_data() s(code) join mtg_sets m on m.code = s.code");
+  for (const r of rows) {
+    const { rows: [v] } = await pool.query("select verify_set_card_data($1, 'scheduled') as r", [r.code]);
+    results.push({ set_code: r.code, ok: v.r.ok });
+    if (r.was_ok && !v.r.ok) {
+      await staffAlert({ email }, `${r.code} card data failed its check`,
+        `${v.r.problem}. Orders for ${r.code} are paused until it passes. Run Import and check on the Stock screen.`);
+    }
+  }
+  return results;
 }

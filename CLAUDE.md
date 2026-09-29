@@ -21,6 +21,7 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 * Scheduled jobs (`apps/api/scripts/jobs.ts`, every 15 minutes via `.github/workflows/jobs.yml`): lock queues past their cutoff, release held buybacks, send drop reminders and break ended emails.
 
 * Card data: `packages/catalog` imports Scryfall bulk data daily (`.github/workflows/scryfall.yml`, needs `NEON_DATABASE_URL`) through `import_scryfall_sets` and `import_scryfall_cards`. Cards match on (set, collector number) so internal ids never change. Search runs on our own database; never call Scryfall per keystroke. This container cannot reach Scryfall or mtgjson.com.
+* Guaranteed card data per set (business context section 15): a set can't go on sale, get a published drop, or take orders until `verify_set_card_data` confirms every printing from its own per set import (`importSetCardData`, `record_set_printings`) is in `cards` with an image. Staff run it from the Stock screen; the scryfall workflow runs it for every set on sale after the bulk job, whether or not the bulk job worked; the 15 minute jobs re-check and alert staff if a set stops passing.
 
 * Sign in: our own email and password (`apps/api/src/routes/auth.ts`, scrypt hashes, HS256 tokens). Staff are promoted with `set_user_role` (admin only).
 * Email: every customer and staff message goes through `EmailProvider` (`apps/api/src/email.ts`, templates in `email-templates.ts`), Gmail SMTP for the test run. The cracked email never names cards or values. Support address everywhere: crackapack.business@gmail.com.

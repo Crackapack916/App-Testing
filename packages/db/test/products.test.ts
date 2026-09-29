@@ -18,6 +18,9 @@ describe("putting a set on sale", () => {
     const tiers = await db.q("select min_qty, per_pack_credits::int from price_tiers where product_id = $1 order by min_qty", [id]);
     expect(tiers.map((t) => [t.min_qty, t.per_pack_credits])).toEqual([[1, 1000], [3, 950], [6, 900]]);
     expect(await db.one("select packs_on_hand, packs_reserved from product_stock where product_id = $1", [id])).toEqual({ packs_on_hand: 0, packs_reserved: 0 });
+    // Section 15: no sale until the set's card data passes its check.
+    await expect(db.q("select set_product_active($1, true, null)", [id])).rejects.toThrow(/card_data_unverified/);
+    await db.q("update mtg_sets set card_data_ok = true where code = 'FDN'");
     await db.q("select set_product_active($1, true, null)", [id]);
     expect((await db.one("select available from storefront where product_id = $1", [id])).available).toBe(false); // no stock yet
   });

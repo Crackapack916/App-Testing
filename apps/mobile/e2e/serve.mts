@@ -44,6 +44,9 @@ const FIX = resolve("../../packages/catalog/test/fixtures/scryfall");
 const tmp = mkdtempSync(join(tmpdir(), "scry-"));
 writeFileSync(join(tmp, "cards.json"), JSON.stringify(JSON.parse(readFileSync(join(FIX, "cards.json"), "utf8")).filter((c: { set: string }) => c.set !== "fdn")));
 await importScryfallBulk(db.pool, { file: join(tmp, "cards.json"), setsFile: join(FIX, "sets.json") });
+// Section 15: M10 (the drops spec's set) gets its per set check from the printings we hold.
+await db.q("select record_set_printings('M10', array(select collector_number from cards where set_code = 'M10'))");
+await db.q("select verify_set_card_data('M10', 'e2e')");
 await db.pool.end();
 
 const api = spawn("npx", ["tsx", resolve("../api/src/server.ts")], {

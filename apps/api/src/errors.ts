@@ -110,6 +110,10 @@ const CODES: Record<string, [number, string]> = {
   session_master_exists: [409, "This night's session recording is already uploaded."],
   policies_not_accepted: [403, "Confirm you are 18 or older and agree to the Terms and Privacy Policy first."],
   unknown_policy: [404, "Page not found."],
+  card_data_unverified: [409, "This set's card data hasn't passed its check yet, so it can't be sold. Import and check it on the Stock screen."],
+  card_data_unavailable: [503, "The card data source isn't set up."],
+  card_data_import_failed: [502, "The card data import failed. Try again in a few minutes."],
+  no_printings: [404, "The card data source has no printings for that set."],
   // payments
   unknown_bundle: [400, "Unknown credit bundle."],
 };

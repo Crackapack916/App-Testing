@@ -174,6 +174,11 @@ test("put a set on sale: create, receive a box, turn it on", async ({ page }) =>
   await card.getByTestId("box-label").fill("EOE-0001");
   await card.getByTestId("receive").click();
   await expect(card.getByTestId("sellable")).toHaveText("29");
+  // Section 15: the set can't go on sale until its card data is imported and checked.
+  await expect(card.getByTestId("toggle")).toBeDisabled();
+  await expect(card.getByTestId("card-data")).toContainText("not checked");
+  await card.getByTestId("check-cards").click();
+  await expect(card.getByTestId("card-data")).toContainText("Card data: checked, 2 printings");
   await card.getByTestId("toggle").click();
   await expect(card).toContainText("On sale");
   await shot(page, "5-stock");

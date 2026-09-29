@@ -75,6 +75,7 @@ export function limiter(intervalMs: number) {
 /** Scryfall API client with required headers and a 10 per second limit. */
 export function scryfallClient(fetchImpl: typeof fetch = fetch, base = SCRYFALL_API) {
   const limit = limiter(100);
+  const searchLimit = limiter(500);
   const get = (path: string) => limit(() => fetchImpl(`${base}${path}`, { headers: HEADERS }));
   return {
     /** /cards/:code/:number, in the 10 per second class. Null when Scryfall has no such printing. */
@@ -107,6 +108,30 @@ export function scryfallClient(fetchImpl: typeof fetch = fetch, base = SCRYFALL_
       const uri = item.jsonl_download_uri ?? item.download_uri;
       if (!uri) throw new Error(`bulk file ${type} has no download link (fields: ${Object.keys(item).join(", ")})`);
       return { uri, updated_at: item.updated_at };
+    },
+    /** One set, by code. Null when Scryfall has no such set. */
+    async set(code: string): Promise<ScryfallSet | null> {
+      const r = await get(`/sets/${encodeURIComponent(code.toLowerCase())}`);
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error(`scryfall set ${r.status}`);
+      return (await r.json()) as ScryfallSet;
+    },
+    /**
+     * Every printing in one set, extras and variations included, page by page. Search is in
+     * Scryfall's 2 per second class, so pages are spaced 500 ms apart.
+     */
+    async setPrintings(code: string): Promise<ScryfallCard[]> {
+      const out: ScryfallCard[] = [];
+      let url: string | null = `${base}/cards/search?q=${encodeURIComponent(`e:${code.toLowerCase()}`)}&unique=prints&include_extras=true&include_variations=true&order=set`;
+      while (url) {
+        const r = await searchLimit(() => fetchImpl(url!, { headers: HEADERS }));
+        if (r.status === 404) break;   // no cards in this set
+        if (!r.ok) throw new Error(`scryfall search ${r.status}`);
+        const page = (await r.json()) as { data: ScryfallCard[]; has_more?: boolean; next_page?: string };
+        out.push(...page.data);
+        url = page.has_more && page.next_page ? page.next_page : null;
+      }
+      return out;
     },
     fetch: (url: string) => limit(() => fetchImpl(url, { headers: HEADERS })),
   };

@@ -17,7 +17,7 @@ customer.get("/storefront", async (c) => {
   const user = c.get("user") ?? null;
   const { rows } = await db.query(
     `select p.id as product_id, p.set_code, s.name as set_name, p.booster_type, p.name, s.icon_svg_uri, s.wizards_info_url,
-            s.pack_image_url, coalesce(product_available_packs(p.id), 0) as stock,
+            s.pack_image_url, s.card_data_ok, coalesce(product_available_packs(p.id), 0) as stock,
             (select json_agg(json_build_object('min_qty', min_qty, 'per_pack_credits', per_pack_credits) order by min_qty)
              from price_tiers t where t.product_id = p.id) as ladder,
             d.id as drop_id, d.starts_at as drop_starts_at, d.ends_at as drop_ends_at, d.state as drop_state,
@@ -39,13 +39,14 @@ customer.get("/storefront", async (c) => {
     const left = Math.max(0, r.set_limit - r.held);
     const room = Math.min(left, r.stock, r.drop_id ? r.drop_remaining : Infinity, meta.max_per_order);
     // One status per set, first match wins, so the page shows one clear reason.
-    const status = meta.break_until ? "on_break"
+    const status = !r.card_data_ok ? "unavailable"
+      : meta.break_until ? "on_break"
       : r.drop_state === "upcoming" ? "upcoming"
       : r.drop_state === "ended" ? "ended"
       : r.stock <= 0 || r.drop_state === "sold_out" ? "sold_out"
       : left <= 0 ? "limit_reached"
       : "available";
-    return { ...r, drop_remaining: undefined, stock: undefined, sold_out: r.stock <= 0, left_for_you: left,
+    return { ...r, drop_remaining: undefined, stock: undefined, card_data_ok: undefined, sold_out: r.stock <= 0, left_for_you: left,
       max_qty: status === "available" ? room : 0, status };
   });
   // `now` lets the app count down on the server's clock, not the phone's.
