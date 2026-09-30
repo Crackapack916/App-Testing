@@ -1,11 +1,14 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { auditContrast, formatIssues, type ContrastIssue } from "./contrast";
 
 const API = "http://localhost:8789";
 const BEFORE = "2026-10-01T15:00:00-07:00";
 const AFTER = "2026-10-01T19:05:00-07:00";
 const at = (min: number) => `2026-10-01T19:${String(10 + min).padStart(2, "0")}:00-07:00`;
 
+const contrast: ContrastIssue[] = [];
 async function shot(page: Page, name: string) {
+  contrast.push(...await auditContrast(page, name));
   if (process.env.SCREENSHOTS) await page.screenshot({ path: `${process.env.SCREENSHOTS}/${name}.png` });
 }
 const setNow = (page: Page, iso: string) => page.evaluate((t) => localStorage.setItem("crackapack.testNow", t), iso);
@@ -50,6 +53,7 @@ async function runNight(request: APIRequestContext) {
 test("a customer's night: order, get cracked, watch, vault, ship, search", async ({ page, request }) => {
   await page.goto("/sign-in");
   await setNow(page, BEFORE);
+  await shot(page, "m0-sign-in");
   await page.getByTestId("email").fill("alice@e2e.test");
   await page.getByTestId("password").fill("alice password");
   await page.getByTestId("submit").click();
@@ -168,4 +172,7 @@ test("a customer's night: order, get cracked, watch, vault, ship, search", async
   await expect(page.getByTestId("card-legalities")).toContainText("standard");
   await expect(page.getByTestId("card-legalities")).toContainText("commander");
   await shot(page, "m6-card");
+  // WCAG AA contrast on every screen above (text over card images is judged by eye).
+  const fails = contrast.filter((i) => i.kind !== "over image");
+  expect(fails, formatIssues(fails)).toEqual([]);
 });

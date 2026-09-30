@@ -26,7 +26,7 @@ button.ghost { background: transparent; }
 button.link { background: none; border: none; color: var(--link); text-decoration: underline; padding: 0 4px; }
 button.big { font-size: 17px; padding: 14px 24px; }
 button.huge { font-size: 24px; padding: 22px 34px; min-width: 280px; }
-kbd { font-family: var(--font-mono); font-size: .75em; border: 1px solid currentColor; border-radius: 6px; padding: 0 5px; margin-left: 6px; opacity: .75; }
+kbd { font-family: var(--font-mono); font-size: .75em; border: 1px solid currentColor; border-radius: 6px; padding: 0 5px; margin-left: 6px; }
 input { font: inherit; background: var(--foil); color: var(--ink); border: 1px solid transparent; border-radius: var(--radius); padding: 10px 12px; width: 100%; }
 input::placeholder { color: var(--common); }
 input:focus, button:focus-visible { outline: 2px solid var(--violet-300); outline-offset: 1px; }

@@ -40,6 +40,11 @@ Customer app tokens live only in `apps/mobile/src/lib/theme.ts`; the staff site 
 * Card art is always the real card image from our database; prices come from our database.
 * Every card has a full frame colored by rarity (common slate, uncommon silver, rare gold, mythic orange). Non foil: flat matte (`rarityMatte`). Foil: polished metal (`rarityFrame`) with the shimmer and a soft glow.
 
+## Accessibility (WCAG 2.2 AA)
+* Contrast, the WebAIM checker's math: text 4.5:1, large text (24px, or 18.66px bold) 3:1, icons and field edges 3:1. Every gradient stop behind text must pass.
+* Never fade text with opacity to make it secondary; use `muted` or `faint`. Disabled controls and decorative art (mark it `aria-hidden` plus `dataSet={{ decorative: "true" }}`) are exempt.
+* `e2e/contrast.ts` audits every rendered screen in both apps' browser suites and fails the run on any miss. Audit new screens by calling `shot` (or `auditContrast`) on them.
+
 ## Guardrails (brief rule 5)
 * No value headlines: no best pull, no vault total, no "hit" callouts. Prices appear per card, small; gold is for credits.
 * The reveal deals the logged cards face down in pulled order. Tap flips one, Reveal all flips the rest one beat apart, press and hold zooms. Same beat for every card, no sound, and it says these are the filmed pack's cards.

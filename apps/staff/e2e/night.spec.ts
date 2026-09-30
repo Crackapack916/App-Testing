@@ -1,7 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
+import { auditContrast, formatIssues, type ContrastIssue } from "../../mobile/e2e/contrast";
 
-/** Set SCREENSHOTS=<dir> to save the key screens while the test runs. */
+/** WCAG AA contrast, checked on every key screen and on the last screen of each test. */
+let contrast: ContrastIssue[] = [];
+test.afterEach(async ({ page }, info) => {
+  contrast.push(...await auditContrast(page, `${info.title} (end)`));
+  const fails = contrast.filter((i) => i.kind !== "over image");
+  contrast = [];
+  expect(fails, formatIssues(fails)).toEqual([]);
+});
+
+/** Set SCREENSHOTS=<dir> to save the key screens while the test runs; every key screen is also audited for contrast. */
 async function shot(page: Page, name: string) {
+  contrast.push(...await auditContrast(page, name));
   if (process.env.SCREENSHOTS) await page.screenshot({ path: `${process.env.SCREENSHOTS}/${name}.png` });
 }
 

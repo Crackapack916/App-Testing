@@ -186,7 +186,8 @@ export function CardBack({ width, height }: { width: number; height: number }) {
   return (
     <Gradient colors={[brand.violet, "#3B2A8C", brand.ink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       style={[s.back, { width, height, borderRadius: Math.max(4, width * 0.06) }]}>
-      <View style={[s.backInner, { borderRadius: Math.max(3, width * 0.045) }]}>
+      {/* Decorative: WCAG sets no contrast minimum for it. */}
+      <View style={[s.backInner, { borderRadius: Math.max(3, width * 0.045) }]} aria-hidden {...{ dataSet: { decorative: "true" } }}>
         <Sparkle size={Math.max(12, width * 0.34)} color={brand.gold} fill={brand.gold} />
       </View>
     </Gradient>

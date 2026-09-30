@@ -50,5 +50,6 @@ Daily live opening platform for Magic: The Gathering packs. Read `docs/CrackAPac
 
 ## Conventions
 * Follow `.claude/skills/db-change` for any schema or function change.
+* Both sites meet WCAG 2.2 AA contrast; `apps/mobile/e2e/contrast.ts` checks every screen in both browser suites (rules in `.claude/skills/brand`).
 * Errors are raised as snake_case codes (`sold_out`, `cutoff_passed`) that the API maps to messages.
 * Guard triggers use `app_flag()`, never a bare `current_setting()`; a NULL comparison silently passes a guard.
