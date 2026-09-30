@@ -54,7 +54,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   return (
     <div className="shell">
       <header className="top">
-        <div className="brand">CrackAPack <span>Ops</span></div>
+        <div className="brand"><img src={`${import.meta.env.BASE_URL}mark.png`} alt="" />Crack<b>A</b>Pack <span>Ops</span></div>
         <nav>
           {TABS.map((t) => (
             <button key={t.id} className={tab === t.id ? "tab on" : "tab"} onClick={() => setTab(t.id)}>
@@ -110,7 +110,7 @@ function Login({ onDone }: { onDone: () => void }) {
   };
   return (
     <form className="login" onSubmit={submit}>
-      <h1>CrackAPack Ops</h1>
+      <h1 className="brand login-brand"><img src={`${import.meta.env.BASE_URL}mark.png`} alt="" />Crack<b>A</b>Pack <span>Ops</span></h1>
       <label>Email<input autoFocus type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
       <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
       <button className="primary" disabled={busy || !email || !password}>Log in</button>

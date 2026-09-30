@@ -9,6 +9,7 @@ import { brand, colors, font, radii, rarityColor, stage, type } from "../lib/the
 import { legalityTags } from "../lib/format";
 import { credits } from "../lib/format";
 import { useSession } from "../lib/session";
+import { Logo } from "./Logo";
 
 // pnpm hoists the staff site's React 18 types for these two packages; the components are the same.
 const Gradient = LinearGradient as unknown as ComponentType<LinearGradientProps & { children?: ReactNode }>;
@@ -176,6 +177,7 @@ export function LegalityTags({ legalities }: { legalities: Record<string, string
 export function Footer(_: { onStage?: boolean }) {
   return (
     <View style={s.footer} accessibilityRole={Platform.OS === "web" ? ("contentinfo" as never) : undefined} testID="footer">
+      <Logo size={16} />
       <Text style={s.footText}>
         CrackAPack is an unofficial retailer. It is not produced by or endorsed by Wizards of the Coast. Magic: The Gathering, card names,
         card images, and set symbols are property of Wizards of the Coast LLC. Card data and images via Scryfall.

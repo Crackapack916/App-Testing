@@ -20,6 +20,12 @@ Surfaces are mixes from the kit: page gradient Ink into `#271652`, panels `#241C
 
 Customer app tokens live only in `apps/mobile/src/lib/theme.ts`; the staff site mirrors them in `:root` of `apps/staff/src/styles.css`. Never name a color anywhere else.
 
+## Logo
+* Source sheet: `docs/brand/logo-sheet.webp`. Crops: `apps/mobile/assets/brand/mark.png` (the torn pack mark, keyed for dark backgrounds), app icons in `apps/mobile/assets/images` and `apps/mobile/public`, staff copies in `apps/staff/public`.
+* Customer app: always `Logo` (mark beside or above the wordmark) or `Wordmark` from `components/Logo.tsx`. Never type "CrackAPack" as a styled heading by hand.
+* Staff site: the `.brand` block in `App.tsx` (mark, Crack, magenta A, Pack, gold Ops).
+* The A is always Hot Magenta; the rest of the wordmark is Foil White. Never recolor, stretch or put the mark on a light background.
+
 ## Components
 * Font: Poppins (400 to 800) in both apps.
 * Page title left, the balance right: gold number, a 2px magenta rule on its left, "credits" underneath (`Title` and `CreditsBadge`).

@@ -6,6 +6,7 @@ import { DobFields } from "../components/DobFields";
 import { api } from "../lib/api";
 import { useSession, type Dob } from "../lib/session";
 import { colors, font } from "../lib/theme";
+import { Logo } from "../components/Logo";
 
 /** For an account made before sign up asked for a date of birth. Asked once, then locked. */
 export default function VerifyAge() {
@@ -21,6 +22,7 @@ export default function VerifyAge() {
   return (
     <Screen>
       <View style={s.wrap}>
+        <Logo size={20} />
         <Text style={s.h1}>Confirm your date of birth</Text>
         <Text style={s.body}>You must be 18 or older to use CrackAPack. This can't be changed once confirmed.</Text>
         <DobFields value={dob} onChange={setDob} />

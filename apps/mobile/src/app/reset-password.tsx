@@ -6,6 +6,7 @@ import { BackButton, Button, ErrorText, Screen } from "../components/bits";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
 import { colors, radius, font } from "../lib/theme";
+import { Logo } from "../components/Logo";
 
 /** Opened from the password reset email. */
 export default function ResetPassword() {
@@ -26,6 +27,7 @@ export default function ResetPassword() {
     <Screen>
       <View style={s.wrap}>
         <BackButton />
+        <Logo size={20} />
         <Text style={s.h1}>Choose a new password</Text>
         <TextInput testID="new-password" value={password} onChangeText={setPassword} secureTextEntry autoComplete={"new-password" as never}
           accessibilityLabel="New password" style={s.input} />

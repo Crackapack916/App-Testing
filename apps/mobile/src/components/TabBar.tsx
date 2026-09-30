@@ -1,12 +1,13 @@
 import { useEffect } from "react";
 import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Box, CalendarClock, CircleUser, Search, Sparkle, SquareX, type LucideIcon } from "./icons";
+import { Box, CalendarClock, CircleUser, Search, SquareX, type LucideIcon } from "./icons";
 import type { ComponentProps } from "react";
 import type { Tabs } from "expo-router";
 import { Text } from "./Text";
 import { brand, colors, font, palette } from "../lib/theme";
 import { useSession } from "../lib/session";
+import { Logo } from "./Logo";
 
 type BottomTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
 
@@ -36,10 +37,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
   if (width >= DESKTOP) {
     return (
       <View style={s.top} accessibilityRole="tablist">
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Sparkle size={22} color={brand.gold} fill={brand.gold} />
-          <Text style={s.brand}>CrackAPack</Text>
-        </View>
+        <Logo size={21} testID="brand" />
         <View style={s.topLinks}>
           {TABS.map((t) => {
             const on = current === t.name;

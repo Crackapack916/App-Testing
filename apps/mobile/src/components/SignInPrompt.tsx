@@ -3,11 +3,13 @@ import { Text } from "./Text";
 import { router } from "expo-router";
 import { Button } from "./bits";
 import { colors, font } from "../lib/theme";
+import { Logo } from "./Logo";
 
 /** What a guest sees on screens that need an account. */
 export function SignInPrompt({ title, body }: { title: string; body: string }) {
   return (
     <View style={s.wrap} testID="sign-in-prompt">
+      <View style={{ alignItems: "center", marginBottom: 8 }}><Logo layout="stacked" size={24} /></View>
       <Text style={s.h1} accessibilityRole="header">{title}</Text>
       <Text style={s.body}>{body}</Text>
       <Button testID="go-sign-in" label="Log in or create an account" onPress={() => router.push("/sign-in")} />

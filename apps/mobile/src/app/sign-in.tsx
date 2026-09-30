@@ -8,6 +8,7 @@ import { DobFields } from "../components/DobFields";
 import { api } from "../lib/api";
 import { useSession, type Dob } from "../lib/session";
 import { colors, radius, font } from "../lib/theme";
+import { Logo } from "../components/Logo";
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -40,7 +41,7 @@ export default function SignIn() {
     <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
       <BackButton />
       <View style={s.card} testID="auth-card">
-        <Text style={s.logo} accessibilityRole="header">CrackAPack</Text>
+        <View style={{ alignItems: "center" }}><Logo size={22} /></View>
         <Text style={s.h1}>{mode === "login" ? "Log in" : mode === "signup" ? "Create your account" : "Reset your password"}</Text>
 
         <View style={s.field}>
@@ -95,7 +96,6 @@ const s = StyleSheet.create({
   page: { flexGrow: 1, padding: 16, alignItems: "center", justifyContent: "flex-start", backgroundColor: colors.bg,
     ...(Platform.OS === "web" ? { minHeight: "100dvh" as never } : null) },
   card: { width: "100%", maxWidth: 380, gap: 10, paddingTop: 8 },
-  logo: { color: colors.text, fontSize: 22, fontFamily: font.display },
   h1: { color: colors.text, fontSize: 20, fontFamily: font.display, marginBottom: 2 },
   field: { gap: 4 },
   label: { color: colors.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1 },
