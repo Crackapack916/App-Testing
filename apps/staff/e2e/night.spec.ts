@@ -233,3 +233,26 @@ test("ship a customer's cards: pick list, tracking, mark shipped", async ({ page
   await card.getByTestId("mark-shipped").click();
   await expect(page.getByText("No shipments waiting.")).toBeVisible();
 });
+
+test("on a phone: one swipeable row of tabs, no keyboard hints, nothing wider than the screen", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/ops/");
+  await setTime(page, "2026-10-02T09:00:00-07:00");
+  await page.getByLabel("Email").fill("ops@e2e.test");
+  await page.getByLabel("Password").fill("ops password");
+  await page.getByRole("button", { name: "Log in" }).click();
+  const tabs = page.locator("nav .tab");
+  await expect(tabs).toHaveCount(7);
+  // Every tab sits on one line, and the header stays short.
+  const tops = await tabs.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+  expect(new Set(tops).size).toBe(1);
+  expect((await page.locator("header.top").boundingBox())!.height).toBeLessThan(130);
+  await expect(page.locator("nav kbd").first()).toBeHidden();
+  for (const name of ["Tonight", "Opening", "Log cards", "Videos", "Drops", "Stock", "Ship"]) {
+    await page.locator("nav .tab", { hasText: name }).click();
+    await page.waitForTimeout(300);
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    expect(wide, `${name} is wider than the screen`).toBeLessThanOrEqual(0);
+    await shot(page, `phone-${name.toLowerCase().replace(" ", "-")}`);
+  }
+});

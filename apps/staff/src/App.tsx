@@ -57,7 +57,8 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
         <div className="brand"><img src={`${import.meta.env.BASE_URL}mark.png`} alt="" />Crack<b>A</b>Pack <span>Ops</span></div>
         <nav>
           {TABS.map((t) => (
-            <button key={t.id} className={tab === t.id ? "tab on" : "tab"} onClick={() => setTab(t.id)}>
+            <button key={t.id} className={tab === t.id ? "tab on" : "tab"} onClick={() => setTab(t.id)}
+              ref={tab === t.id ? (el) => el?.scrollIntoView({ block: "nearest", inline: "nearest" }) : undefined}>
               {t.label} <kbd>{t.key.toUpperCase()}</kbd>
             </button>
           ))}

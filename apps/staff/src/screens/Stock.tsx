@@ -41,7 +41,7 @@ function NewProduct({ onCreated }: { onCreated: () => void }) {
     <section className="panel">
       <h2>Put a set on sale</h2>
       <div className="entry">
-        <input data-testid="set-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Set name or code (from MTGJSON)" />
+        <input data-testid="set-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Set name or code" />
         <select value={type} onChange={(e) => setType(e.target.value)}>
           <option value="play">Play booster</option>
           <option value="collector">Collector booster</option>

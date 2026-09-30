@@ -129,11 +129,24 @@ input.small { width: 90px; text-align: right; }
 /* Phones: tables scroll inside their panel, never the page. */
 .panel { overflow-x: auto; }
 @media (max-width: 700px) {
-  .top { gap: 10px; padding: 10px 12px; }
-  nav { flex-wrap: wrap; }
+  /* One compact header that stays on screen: brand and night on top, then the tabs in a single row you swipe. */
+  .top { position: sticky; top: 0; z-index: 5; gap: 8px 10px; padding: 10px 12px 0; }
+  .brand { font-size: 17px; } .brand img { height: 26px; }
+  .night { font-size: 13px; gap: 6px; }
+  nav { order: 3; flex: 1 0 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -12px; padding: 0 12px 10px; scroll-padding: 0 12px; }
+  nav::-webkit-scrollbar { display: none; }
+  .tab { flex: none; padding: 8px 14px; }
   main { padding: 12px; }
   .entry { flex-wrap: wrap; }
+  /* Titles and text first; their button drops below instead of squeezing into two lines. */
+  .row-between { flex-wrap: wrap; }
+  .row { flex-wrap: wrap; }
+  .row-between > button, .tab { white-space: nowrap; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stat .value { font-size: 22px; }
 }
+/* Touch screens have no keyboard shortcuts to show. */
+@media (hover: none) and (pointer: coarse), (max-width: 700px) { kbd { display: none; } }
 /* Videos */
 .small { font-size: 12px; }
 .check { display: flex; align-items: center; gap: 8px; color: var(--text); }
