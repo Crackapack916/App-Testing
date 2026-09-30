@@ -60,7 +60,9 @@ export function Title({ children, sub, balance = true, back }: { children: React
     <View style={s.titleWrap}>
       {back ? <BackButton fallback={back} /> : null}
       <View style={s.titleRow}>
-        <Text style={[type.h1, { flex: 1 }]} accessibilityRole="header">{children}</Text>
+        {typeof children === "string"
+          ? <Text style={[type.h1, { flex: 1 }]} accessibilityRole="header">{children}</Text>
+          : <View style={{ flex: 1 }} accessibilityRole="header">{children}</View>}
         {balance ? <CreditsBadge /> : null}
       </View>
       {sub ? <Text style={[type.body, { color: colors.muted, marginTop: 2 }]}>{sub}</Text> : null}

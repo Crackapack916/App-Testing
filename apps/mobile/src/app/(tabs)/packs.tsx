@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Check, ExternalLink, Minus, Plus } from "../../components/icons";
 import { Text } from "../../components/Text";
 import { Button, ErrorText, Footer, Stage, Title } from "../../components/bits";
+import { Logo } from "../../components/Logo";
 import { Carousel } from "../../components/Carousel";
 import { PackArt } from "../../components/PackArt";
 import { api } from "../../lib/api";
@@ -55,7 +56,7 @@ export default function Packs() {
   return (
     <Stage>
       <ScrollView contentContainerStyle={{ paddingBottom: 110 }}>
-        <Title>Packs</Title>
+        <Title><Logo size={24} testID="packs-logo" /></Title>
 
         {store.data && !products.length ? (
           <View style={s.none}>
